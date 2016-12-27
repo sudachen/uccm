@@ -1,15 +1,15 @@
 
 
 #pragma uccm require_uccm_revision(1+)
-#pragma uccm home(armcc) = "%ARM_KCC_HOME%"
-#pragma uccm home(gcc) = "%ARM_GCC_HOME%"
+#pragma uccm home(armcc) = %ARM_KCC_HOME%
+#pragma uccm home(gcc) = %ARM_GCC_HOME%
 
 #ifdef __ARMCC_VERSION
 #define __keil_v5
 #endif
 
-#pragma uccm cflags(armcc)+="--c99 --no_wrap_diagnostics --diag_suppress 161"
-#pragma uccm cflags(gcc)+="--std=c99 -fmessage-length=0 -Wl,--gc-sections -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas"
+#pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161
+#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -Wl,--gc-sections -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
 
 #include <stdint.h>
 #include "macro.h"
