@@ -14,6 +14,8 @@ case class UccmCflags(value:String) extends UccmPragma
 case class UccmRequire(tag:String,value:String) extends UccmPragma
 case class UccmAppend(tag:String, value:String) extends UccmPragma
 case class UccmDefault(tag:String, value:String) extends UccmPragma
+case class UccmInfo(tag:String, value:String) extends UccmPragma
+case class UccmDownload(tag:String, value:String) extends UccmPragma
 
 object Pragmas {
   def extractFrom(file:File) : Stream[UccmPragma] = {
@@ -25,31 +27,43 @@ object Pragmas {
       case _ => f.close; Stream.empty
     }
 
-    val rXcflags = "#pragma\\s*uccm\\s*xcflags\\((\\S+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rBoard   = "#pragma\\s*uccm\\s*board\\((\\S+)\\)\\s*=\\s*(.+)$".r
-    val rHome    = "#pragma\\s*uccm\\s*home\\((\\S+)\\)\\s*=\\s*(.+)$".r
+    val rXcflags = "#pragma\\s*uccm\\s*xcflags\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rBoard   = "#pragma\\s*uccm\\s*board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rHome    = "#pragma\\s*uccm\\s*home\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
-    val rRequire = "#pragma\\s*uccm\\s*require\\((\\S+)\\)\\s*=\\s*(.+)$".r
-    val rFile    = "#pragma\\s*uccm\\s*file\\((\\S+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rDefault = "#pragma\\s*uccm\\s*default\\((\\S+)\\)\\s*=\\s*(.+)$".r
+    val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rFile    = "#pragma\\s*uccm\\s*file\\((\\w+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rDefault = "#pragma\\s*uccm\\s*default\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rInfo    = "#pragma\\s*uccm\\s*info\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rDownload= "#pragma\\s*uccm\\s*download\\((\\w+)\\)\\s*=\\s*(.+)$".r
 
-    def ns(s:String) = s.dropRight(s.length-s.lastIndexWhere { _ !=  ' ' }-1)
+    def ns(s:String) = {
+      val ss = s.dropRight(s.length-s.lastIndexWhere { _ !=  ' ' }-1)
+      if ( ss.length >= 2 && ss.startsWith("\"") && ss.endsWith("\"") )
+        ss.drop(1).dropRight(1)
+      else
+        ss
+    }
 
-    def ps(s: Stream[String]) : Stream[UccmPragma] = s match {
-      case xs #:: t => xs match {
-        case rXcflags(tag,value) => UccmXcflags(tag,ns(value)) #:: ps(t)
-        case rBoard(tag,value) => UccmBoard(tag,ns(value)) #:: ps(t)
-        case rHome(tag,value) => UccmHome(tag,ns(value)) #:: ps(t)
-        case rCflags(value) => UccmCflags(value) #:: ps(t)
-        case rRequire(tag,value) => UccmRequire(tag,ns(value)) #:: ps(t)
-        case rFile(tag,value) => UccmAppend(tag,ns(value)) #:: ps(t)
-        case rDefault(tag,value) => UccmDefault(tag,ns(value)) #:: ps(t)
-        case _ => ps(t)
-      }
+    def parse(s:String): Option[UccmPragma] = s match {
+      case rXcflags(tag,value) => Some(UccmXcflags(tag,ns(value)))
+      case rBoard(tag,value) => Some(UccmBoard(tag,ns(value)))
+      case rHome(tag,value) => Some(UccmHome(tag,ns(value)))
+      case rCflags(value) => Some(UccmCflags(value))
+      case rRequire(tag,value) => Some(UccmRequire(tag,ns(value)))
+      case rFile(tag,value) => Some(UccmAppend(tag,ns(value)))
+      case rDefault(tag,value) => Some(UccmDefault(tag,ns(value)))
+      case rInfo(tag,value) => Some(UccmInfo(tag,ns(value)))
+      case rDownload(tag,value) => Some(UccmDownload(tag,ns(value)))
+      case _ => None
+    }
+
+    def qs(s: Stream[String]) : Stream[Option[UccmPragma]] = s match {
+      case xs #:: t => parse(xs) #:: qs(t)
       case _ => Stream.empty
     }
 
-    ps(js(f.getLines().toStream))
+    qs(js(f.getLines().toStream)).filter{!_.isEmpty}.map{_.get}
   }
 }
 
@@ -305,23 +319,69 @@ object Uccm {
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
 
-    def expandEnv(s:String):String = "(\\%(\\w+)\\%)".r findFirstMatchIn s match {
-      case Some(m) => expandEnv(s.replace(m.group(1),sys.env.getOrElse(m.group(2),m.group(2))))
-      case None => s
+    def expandEnv(s:String):Option[String] = "(\\%(\\w+)\\%)".r findFirstMatchIn s match {
+      case Some(m) =>
+        if ( sys.env.contains(m.group(2)) )
+          expandEnv(s.replace(m.group(1),sys.env(m.group(2))))
+        else
+          None
+      case None => Some(s)
     }
 
-    val homes = boardPragmas.foldLeft( Map[String,String]() ) {
-      (homes,prag) => prag match {
-        case UccmHome(tag,path) => homes + (tag -> expandEnv(path))
-        case _ => homes
-      }
-    } + ("inc" -> incDir.getCanonicalPath) + ("src" -> mainFile.getParentFile.getCanonicalPath)
+    case class Component ( home: Option[String] = None, info: Option[String] = None, download:Option[String] = None )
 
-    homes.foreach { (p) => println(s"${p._1} => ${p._2}")}
+    val components = boardPragmas.foldLeft( Map[String,Component]() ) {
+      (components,prag) => prag match {
+        case UccmHome(tag,path) => components + (tag -> (components.get(tag) match {
+          case Some(c) => c.copy(home = Some(path))
+          case None => Component(home = Some(path))
+        }))
+        case UccmInfo(tag,text) => components + (tag -> (components.get(tag) match {
+          case Some(c) => c.copy(info = Some(text))
+          case None => Component(info = Some(text))
+        }))
+        case UccmDownload(tag,url) => components + (tag -> (components.get(tag) match {
+          case Some(c) => c.copy(download = Some(url))
+          case None => Component(download = Some(url))
+        }))
+        case _ => components
+      }
+    } +
+      ("inc" -> Component(home = Some(incDir.getCanonicalPath))) +
+      ("src" -> Component(home = Some(mainFile.getParentFile.getCanonicalPath)))
+
+    def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
 
     def expandHome(s:String):String = "(\\[(\\w+)\\])".r findFirstMatchIn s match {
-      case Some(m) => expandHome(s.replace(m.group(1),homes.getOrElse(m.group(2),m.group(2))))
       case None => s
+      case Some(m) => components.get(m.group(2)) match {
+        case Some(Component(None, info, Some(url))) =>
+          System.err.println(s"looks like required to download ${m.group(2)} from $url")
+          System.exit(1)
+          s
+        case Some(Component(Some(home), _, u)) =>
+          expandEnv(home) match {
+            case Some(path) if dirExists(path) => expandHome(s.replace(m.group(1), path))
+            case Some(path) =>
+              System.err.println(s"${m.group(2)} home '$home' expands to nonexistant path '$path'")
+              System.exit(1)
+              s
+            case None => u match {
+              case None =>
+                System.err.println(s"looks like ${m.group(2)} home '$home' uses undefined environment variable")
+                System.exit(1)
+                s
+              case Some(url) =>
+                System.err.println(s"looks like required to download ${m.group(2)} from $url")
+                System.exit(1)
+                s
+            }
+          }
+        case _ =>
+          System.err.println(s"unknown component ${m.group(2)}, could not expand compenent home")
+          System.exit(1)
+          s
+      }
     }
 
     val xcflags = boardPragmas.foldLeft( s"-I${uccmHome.getCanonicalPath}" :: Nil ) {
@@ -350,15 +410,14 @@ object Uccm {
     val buildScriptFile = new File(buildDir,"script.xml")
 
     def extractFromPreprocessor = {
-      val buffer = new StringBuffer()
       val tempFile = File.createTempFile("uccm",".gcc.i")
       val mainFilePath = mainFile.getCanonicalPath
       val gccPreprocCmdline = cc + " -E " + xcflags.map{expandHome}.mkString(" ") + " " + mainFilePath
       println(gccPreprocCmdline)
 
-      val errCode = (gccPreprocCmdline #> tempFile) ! ProcessLogger{buffer append _}
+      val errCode = (gccPreprocCmdline #> tempFile) !
+
       if ( errCode != 0 ) {
-        System.err.println(buffer)
         System.err.println("failed to preprocess main C-file")
         System.exit(1)
       }
@@ -372,6 +431,7 @@ object Uccm {
           }
           case UccmCflags(value) => bs.copy(cflags = value :: bs.cflags)
           case UccmBoard(`targetBoard`,value) => bs.copy(cflags = value :: bs.cflags)
+          case UccmBoard("*",value) => bs.copy(cflags = value :: bs.cflags)
           case UccmRequire("module",value) => bs.copy(modules = value :: bs.modules)
           case UccmRequire("source",value) => bs.copy(sources = value :: bs.sources)
           case UccmRequire("lib",value) => bs.copy(libraries = value :: bs.libraries)
@@ -407,17 +467,24 @@ object Uccm {
 
   def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {
     val boardDir = new File(uccmHome,"uccm/board")
+    val localBoardDir = new File(getCurrentDirectory,"board")
 
     def f(s:Stream[File]) : Stream[List[UccmPragma]] =  s match {
       case xs #:: t => Pragmas.extractFrom(xs).toList #:: f(t)
       case _ => Stream.empty
     }
 
-    val boardPragmas: Option[List[UccmPragma]] = {
-      if ( !boardDir.exists || !boardDir.isDirectory )
-        Stream.empty
+    val localBoardFiles : List[File] =
+      if ( localBoardDir.exists && localBoardDir.isDirectory )
+        localBoardDir.listFiles.toList
       else
-        f(boardDir.listFiles.toStream)
+        Nil
+
+    val boardPragmas: Option[List[UccmPragma]] = {
+      if ( boardDir.exists && boardDir.isDirectory )
+        f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
+      else
+        Stream.empty
     } find {
         x => x.exists {
           case UccmBoard(`targetBoard`,_) => true

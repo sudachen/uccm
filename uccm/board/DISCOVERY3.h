@@ -2,9 +2,7 @@
 #pragma once
 #include "../uccm.h"
 
-#pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
-#pragma uccm home(cubefx_fw_f3_drv)= %CUBEFX_FW_F3%/Drivers/STM32F3xx_HAL_Driver/Src
-#pragma uccm board(discovery3)= -D_BOARD=DISCOVERY3
+#pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h
 #pragma uccm xcflags(armcc)+= --cpu Cortex-M4
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 #pragma uccm xcflags(*)+= -I[inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
@@ -16,10 +14,9 @@
 #pragma uccm require(ldscript) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
 #endif
 
-#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c)
-
-#pragma uccm require(module) = [cubefx_fw_f3_drv]/stm32f3xx_hal_rcc.c
-#pragma uccm require(module) = [cubefx_fw_f3_drv]/stm32f3xx_hal_ex.c
+#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c
+#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_rcc.c
+#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_ex.c
 
 #pragma uccm file(stm32f3xx_hal_conf.h) += \
 #pragma once\n\
