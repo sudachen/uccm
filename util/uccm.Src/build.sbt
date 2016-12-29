@@ -12,5 +12,7 @@ lazy val root = (project in file(".")).
     name := "uccm",
     oneJarSettings,
     libraryDependencies += "com.github.scopt" %% "scopt" % "3.5.0",
-    libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
+    libraryDependencies += "commons-lang" % "commons-lang" % "2.6",
+    libraryDependencies += "commons-io" % "commons-io" % "2.5",
+    libraryDependencies += "org.scala-lang.modules" % "scala-xml_2.12" % "1.0.6"
   )

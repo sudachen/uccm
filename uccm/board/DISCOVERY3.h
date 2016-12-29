@@ -3,24 +3,23 @@
 #include "../uccm.h"
 
 #pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
-#pragma uccm board(discovery3)= -DBOARD=DISCOVERY3
+#pragma uccm home(cubefx_fw_f3_drv)= %CUBEFX_FW_F3%/Drivers/STM32F3xx_HAL_Driver/Src
+#pragma uccm board(discovery3)= -D_BOARD=DISCOVERY3
 #pragma uccm xcflags(armcc)+= --cpu Cortex-M4
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 #pragma uccm xcflags(*)+= -I[inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
 
-#define REQUIRE_HAL_DRIVER(Name) [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_##Name##.c
-
 #ifdef __keil_v5
-#pragma uccm require([cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/arm/startup_stm32f303xc.s)
+#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/arm/startup_stm32f303xc.s
 #else // assume gcc
-#pragma uccm require([cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s)
-#pragma uccm require([cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld)
+#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s
+#pragma uccm require(ldscript) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
 #endif
 
-#pragma uccm require([cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c)
+#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c)
 
-#pragma uccm require(REQUIRE_HAL_DRIVER(rcc))
-#pragma uccm require(REQUIRE_HAL_DRIVER(rcc_ex))
+#pragma uccm require(module) = [cubefx_fw_f3_drv]/stm32f3xx_hal_rcc.c
+#pragma uccm require(module) = [cubefx_fw_f3_drv]/stm32f3xx_hal_ex.c
 
 #pragma uccm file(stm32f3xx_hal_conf.h) += \
 #pragma once\n\
@@ -46,7 +45,7 @@
 #define HAL_PWR_MODULE_ENABLED\n\
 #define HAL_CORTEX_MODULE_ENABLED\n\
 
-#define UCCM_LL_INCLUDE(File) _STR(../stm32f3/ll_##File)
+#define UCCM_LL_INCLUDE(File) <uccm/stm32f3/ll_##File>
 
 #define STM32F303xC
 #include <stm32f3xx.h>

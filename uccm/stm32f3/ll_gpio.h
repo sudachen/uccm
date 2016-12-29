@@ -4,8 +4,8 @@
 #include "../board.h"
 #include "../leg.h"
 
-#pragma uccm append(HAL_CONFIG) = "#define HAL_GPIO_MODULE_ENABLED\n"
-#pragma uccm require(HAL_DRIVER(gpio))
+#pragma uccm file(stm32f3xx_hal_conf.h) += "#define HAL_GPIO_MODULE_ENABLED\n"
+#pragma uccm require(module) = [cubefx_fw_f3_drv]/stm32f3xx_gpio.c
 
 __Inline
 void gpio_setup_input(uccm_leg_t leg, uccm_gpio_input_t opt)
