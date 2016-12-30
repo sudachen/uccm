@@ -1,5 +1,5 @@
 package uccm
-import java.io.File
+import java.io.{File,FileWriter}
 import java.net.JarURLConnection
 
 import org.apache.commons.io.FileUtils
@@ -32,7 +32,7 @@ object Pragmas {
     val rHome    = "#pragma\\s*uccm\\s*home\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
     val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*=\\s*(.+)$".r
-    val rFile    = "#pragma\\s*uccm\\s*file\\((\\w+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rFile    = "#pragma\\s*uccm\\s*file\\(([\\.\\-\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rDefault = "#pragma\\s*uccm\\s*default\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rInfo    = "#pragma\\s*uccm\\s*info\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rDownload= "#pragma\\s*uccm\\s*download\\((\\w+)\\)\\s*=\\s*(.+)$".r
@@ -63,7 +63,7 @@ object Pragmas {
       case _ => Stream.empty
     }
 
-    qs(js(f.getLines().toStream)).filter{!_.isEmpty}.map{_.get}
+    qs(js(f.getLines().toStream)).filter{_.isDefined}.map{_.get}
   }
 }
 
@@ -84,6 +84,11 @@ object Compiler extends Enumeration {
     case _ => None
   }
 
+  def stringify(kind:Value) = kind match {
+    case GCC => "gcc"
+    case ARMCC => "armcc"
+  }
+
   def ccPath(kind:Value):String = kind match {
     case ARMCC => "[armcc]\\bin\\armcc.exe"
     case GCC => "[gcc]\\bin\\arm-none-eabi-gcc.exe"
@@ -99,18 +104,18 @@ object Debugger extends Enumeration {
   }
 }
 
-case class BuildScript(ccTool:String,
-                       cflags:List[String],
-                       sources:List[String],
-                       modules:List[String],
-                       libraries:List[String],
-                       generated:List[(String,String)],
+case class BuildScript(ccTool:Compiler.Value,
+                       cflags:List[String] = Nil,
+                       sources:List[String] = Nil,
+                       modules:List[String] = Nil,
+                       libraries:List[String] = Nil,
+                       generated:List[(String,String)] = Nil,
                        begin:List[String] = Nil,
                        end:List[String] = Nil ) {
   def toXML : scala.xml.Node = {
     <uccm>
       <cctool>
-        {ccTool}
+        {Compiler.stringify(ccTool)}
       </cctool>
       <cflags>
         {cflags map { i =>
@@ -152,16 +157,17 @@ case class BuildScript(ccTool:String,
 }
 
 object BuildScript {
-
-  def fromXML(xml: scala.xml.Node) : BuildScript =
+  def fromXML(xml: scala.xml.Node) : BuildScript = {
+    def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
+    def ns(s:String) = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
     BuildScript(
-      (xml \ "cctool" ).text,
-      (xml \ "cflags" \ "flag" ) .map { _.text } .toList,
-      (xml \ "sources" \ "file" ) .map { _.text } .toList,
-      (xml \ "modules" \ "file" ) .map { _.text } .toList,
-      (xml \ "libraries" \ "file" ) .map { _.text } .toList,
-      (xml \ "generated" \ "append" ) .map { x => ((x\"name").text,(x\"content").text) } .toList
-    )
+      Compiler.fromString(ns((xml\"cctool" ).text)).get,
+      (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
+      (xml\"sources"\"file").map{ x => ns(x.text)}.toList,
+      (xml\"modules"\"file").map{ x => ns(x.text)}.toList,
+      (xml\"libraries"\"file").map{ x => ns(x.text)}.toList,
+      (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
+    )}
 }
 
 case class MainDefaults(board:Option[String],
@@ -173,11 +179,13 @@ case class MainDefaults(board:Option[String],
 }
 
 case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
-                       targets: Set[Target.Value] = Set(Target.Build),
-                       board: Option[String] = None,
+                       targets:  Set[Target.Value] = Set(Target.Build),
+                       board:    Option[String] = None,
                        compiler: Option[Compiler.Value] = None,
                        debugger: Option[Debugger.Value] = None,
-                       mainFile: Option[File] = None)
+                       mainFile: Option[File] = None,
+                       verbose:  Boolean = false
+                      )
 
 object Uccm {
 
@@ -188,6 +196,10 @@ object Uccm {
         text("show this help and exit")
 
       override def showUsageOnError = true
+
+      opt[Unit]('v',"verbose").
+        action( (_,c) => c.copy(verbose = true)).
+        text("verbose output")
 
       opt[Unit]("rebuild").
         action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
@@ -258,13 +270,16 @@ object Uccm {
       case rJar(path) => Some(new File(path).getParentFile.getAbsolutePath)
       case rJarOne(path) => Some(new File(path).getParentFile.getAbsolutePath)
       case rClass(path) => Some(new File(path).getAbsolutePath)
-      case p => { println(p); None }
+      case p => println(p); None
     }
   }
 
-  def act(cmdlOpts: CmdlOptions) : Unit = {
+  def panic(text:String) = {
+    System.err.println(text)
+    System.exit(1)
+  }
 
-    println(getUccmDirectory)
+  def act(cmdlOpts: CmdlOptions) : Unit = {
 
     val mainFile : File = cmdlOpts.mainFile match {
       case Some(f) if f.isAbsolute => f
@@ -272,10 +287,10 @@ object Uccm {
       case None => new File("main.c").getAbsoluteFile
     }
 
-    if ( !mainFile.exists ) {
-      System.err.println("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
-      System.exit(1)
-    }
+    def verbose(s:String) = if (cmdlOpts.verbose) println(s)
+
+    if ( !mainFile.exists )
+      panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
 
     val defaults = Pragmas.extractFrom(mainFile).foldLeft( MainDefaults(None,Compiler.GCC,Debugger.STLINK,Nil)) {
       ( dflts, prag ) => prag match {
@@ -301,13 +316,10 @@ object Uccm {
 
     val boardPragmas : List[UccmPragma] = preprocessUccmBoardFiles(targetBoard,uccmHome)
 
-    if ( boardPragmas.isEmpty ) {
-      System.err.println(s"unknown board $targetBoard")
-      System.exit(1)
-    }
+    if ( boardPragmas.isEmpty )
+      panic(s"unknown board $targetBoard")
 
     println(s"uccm is working now for board $targetBoard")
-    println(s"uccm is using $targetCompiler compiler")
 
     val buildDir = new File(mainFile.getParentFile,
       if ( cmdlOpts.buildConfig == BuildConfig.Release ) s"~Release/$targetBoard"
@@ -356,31 +368,21 @@ object Uccm {
       case None => s
       case Some(m) => components.get(m.group(2)) match {
         case Some(Component(None, info, Some(url))) =>
-          System.err.println(s"looks like required to download ${m.group(2)} from $url")
-          System.exit(1)
-          s
+          panic(s"looks like required to download ${m.group(2)} from $url");s
         case Some(Component(Some(home), _, u)) =>
           expandEnv(home) match {
             case Some(path) if dirExists(path) => expandHome(s.replace(m.group(1), path))
             case Some(path) =>
-              System.err.println(s"${m.group(2)} home '$home' expands to nonexistant path '$path'")
-              System.exit(1)
-              s
+              panic(s"${m.group(2)} home '$home' expands to nonexistant path '$path'");s
             case None => u match {
               case None =>
-                System.err.println(s"looks like ${m.group(2)} home '$home' uses undefined environment variable")
-                System.exit(1)
-                s
+                panic(s"looks like ${m.group(2)} home '$home' uses undefined environment variable");s
               case Some(url) =>
-                System.err.println(s"looks like required to download ${m.group(2)} from $url")
-                System.exit(1)
-                s
+                panic(s"looks like required to download ${m.group(2)} from $url");s
             }
           }
         case _ =>
-          System.err.println(s"unknown component ${m.group(2)}, could not expand compenent home")
-          System.exit(1)
-          s
+          panic(s"unknown component ${m.group(2)}, could not expand compenent home");s
       }
     }
 
@@ -397,8 +399,6 @@ object Uccm {
       }
     } .map{expandHome} .reverse
 
-    val cc = expandHome(Compiler.ccPath(targetCompiler))
-
     if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
@@ -410,19 +410,16 @@ object Uccm {
     val buildScriptFile = new File(buildDir,"script.xml")
 
     def extractFromPreprocessor = {
+      val cc = expandHome(Compiler.ccPath(targetCompiler))
       val tempFile = File.createTempFile("uccm",".gcc.i")
       val mainFilePath = mainFile.getCanonicalPath
       val gccPreprocCmdline = cc + " -E " + xcflags.map{expandHome}.mkString(" ") + " " + mainFilePath
-      println(gccPreprocCmdline)
 
-      val errCode = (gccPreprocCmdline #> tempFile) !
+      verbose(gccPreprocCmdline)
+      if ( 0 != (gccPreprocCmdline #> tempFile!) )
+        panic("failed to preprocess main C-file")
 
-      if ( errCode != 0 ) {
-        System.err.println("failed to preprocess main C-file")
-        System.exit(1)
-      }
-
-      Pragmas.extractFrom(tempFile).foldLeft( BuildScript(cc,Nil,List(mainFilePath),Nil,Nil,Nil)) {
+      Pragmas.extractFrom(tempFile).foldLeft(BuildScript(targetCompiler,List(s"-I${uccmHome.getCanonicalPath}"),List(mainFilePath))) {
         (bs,prag) => prag match {
           case UccmXcflags(x,value) => Compiler.fromString(x) match {
             case Some(`targetCompiler`) => bs.copy(cflags = value :: bs.cflags)
@@ -462,7 +459,37 @@ object Uccm {
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
       scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
 
-    executeBuildScript(buildScript,cmdlOpts.targets)
+    if ( cmdlOpts.targets.contains(Target.Rebuild) )
+      buildScript.generated.foreach {
+        case ( fname, content ) =>
+          val text = content.replace("\\n","\n").replace("\\t","\t")
+          val wr = new FileWriter(new File(incDir,fname),true)
+          wr.write(text)
+          wr.close()
+      }
+
+    println(s"uccm is using ${buildScript.ccTool} compiler")
+    val cc = expandHome(Compiler.ccPath(buildScript.ccTool))
+
+    val objects = buildScript.sources.foldLeft(List[String]()) { (ls,source) => {
+      val srcFile = new File(source)
+        val objFileName = srcFile.getName + ".obj"
+        val objFile = new File(objDir,objFileName)
+        if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+          !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
+          val gccCmdline: String = (List(cc, "-c ") ++
+            buildScript.cflags.map {
+              expandHome
+            } ++
+            List(srcFile.getCanonicalPath, "-o", objFile.getCanonicalPath)).mkString(" ")
+          verbose(gccCmdline)
+          if (0 != (gccCmdline !))
+            panic(s"failed to compile ${srcFile.getName}")
+        }
+        objFile.getName :: ls
+    }}
+
+    println("succeeded")
   }
 
   def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {

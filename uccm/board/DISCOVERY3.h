@@ -2,7 +2,7 @@
 #pragma once
 #include "../uccm.h"
 
-#pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h
+#pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h -DSTM32F303xC
 #pragma uccm xcflags(armcc)+= --cpu Cortex-M4
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 #pragma uccm xcflags(*)+= -I[inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
@@ -44,24 +44,22 @@
 
 #define UCCM_LL_INCLUDE(File) <uccm/stm32f3/ll_##File>
 
-#define STM32F303xC
 #include <stm32f3xx.h>
 
 #define UCCM_BOARD_LEDS \
     (0,PE8, LEG_PUSH_PULL),(1,PE9, LEG_PUSH_PULL),(2,PE10,LEG_PUSH_PULL),(3,PE11,LEG_PUSH_PULL),\
     (4,PE12,LEG_PUSH_PULL),(5,PE13,LEG_PUSH_PULL),(6,PE14,LEG_PUSH_PULL),(7,PE15,LEG_PUSH_PULL)
+
 #define UCCM_BOARD_LEDS_COUNT 8
 #define UCCM_BOARD_BUTTONS (0, PA0, LEG_FLOAT)
 #define UCCM_BOARD_BUTTONS_COUNT 1
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
 
-#include "../leds.h"
-#include "../buttons.h"
+//#include "../leds.h"
+//#include "../buttons.h"
 
 __Inline
-void board_setup()
+void ucBoard_Setup()
 {
-    board_setup_leds();
-    board_setup_buttons();
 }
 

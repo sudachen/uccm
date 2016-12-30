@@ -9,7 +9,7 @@
 #pragma uccm download(gcc)= "https://launchpad.net/gcc-arm-embedded/4.8/4.8-2014-q3-update/+download/gcc-arm-none-eabi-4_8-2014q3-20140805-win32.zip"
 
 #pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
-#pragma uccm info(cubefx_fw_f3)= CubeFx Framework for Stm32F3 
+#pragma uccm info(cubefx_fw_f3)= CubeFx Framework for stm32f3 
 #pragma uccm download(cubefx_fw_f3)= "https://uccmpaks.keepmywork.com/cubefx_fw_f3.zip"
 
 
