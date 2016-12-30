@@ -22,8 +22,10 @@
 #pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
 
 #ifdef __keil_v5
+#pragma uccm ldflags+= --info summarysizes --map --xref --callgraph --symbols --info sizes --info totals --info unused --info veneers --list [@build]/firmware.map
+
 #else
-#pragma uccm ldflags+= -mthumb -Wl,--gc-sections
+#pragma uccm ldflags+= -mthumb -Wl,--gc-sections,--cref,-Map=[@build]/firmware.map
 #endif
 
 #include <stdint.h>

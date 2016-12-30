@@ -5,10 +5,11 @@
 #pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h -DSTM32F303xC
 #pragma uccm xcflags(armcc)+= --cpu Cortex-M4
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
-#pragma uccm xcflags(*)+= -I[inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
+#pragma uccm xcflags(*)+= -I[@inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
 
 #ifdef __keil_v5
 #pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/arm/startup_stm32f303xc.s
+#pragma uccm ldflags+= --cpu Cortex-M4
 #else // assume gcc
 #pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s
 #pragma uccm ldflags+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
@@ -18,6 +19,7 @@
 #pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal.c
 #pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_gpio.c
 #pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_rcc.c
+#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_cortex.c
 
 #pragma uccm file(stm32f3xx_hal_conf.h) += \
 #pragma once\n\
@@ -38,20 +40,21 @@
 #define INSTRUCTION_CACHE_ENABLE 0\n\
 #define DATA_CACHE_ENABLE 0\n\
 #define HAL_MODULE_ENABLED\n\
-#define HAL_DMA_MODULE_ENABLED\n\
 #define HAL_RCC_MODULE_ENABLED\n\
-#define HAL_FLASH_MODULE_ENABLE\n\
-#define HAL_PWR_MODULE_ENABLED\n\
 #define HAL_CORTEX_MODULE_ENABLED\n\
 #define HAL_GPIO_MODULE_ENABLED\n\
+#define HAL_FLASH_MODULE_ENABLE\n\
+#include <stm32f3xx_hal.h>\n\
 #include <stm32f3xx_hal_gpio.h>\n\
 #include <stm32f3xx_hal_rcc.h>\n\
-#include <stm32f3xx_hal_dma.h>\n\
 #include <stm32f3xx_hal_cortex.h>\n\
 #include <stm32f3xx_hal_flash.h>\n\
-#include <stm32f3xx_hal_pwr.h>\n\
 
 /*
+#define HAL_DMA_MODULE_ENABLED\n\
+#include <stm32f3xx_hal_dma.h>\n\
+#define HAL_PWR_MODULE_ENABLED\n\
+#include <stm32f3xx_hal_pwr.h>\n\
 #define HAL_ADC_MODULE_ENABLED
 #include <stm32f3xx_hal_adc.h>
 #define HAL_CAN_MODULE_ENABLED
