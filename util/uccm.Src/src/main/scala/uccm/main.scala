@@ -1,9 +1,6 @@
 package uccm
 import java.io.{File,FileWriter}
-import java.net.JarURLConnection
-
 import org.apache.commons.io.FileUtils
-
 import sys.process._
 
 class UccmPragma
@@ -170,12 +167,16 @@ object BuildScript {
     )}
 }
 
+case class Component ( home: Option[String] = None,
+                       info: Option[String] = None,
+                       download:Option[String] = None )
+
 case class MainDefaults(board:Option[String],
                         compiler:Compiler.Value,
                         debugger:Debugger.Value,
                         msgs:List[String]) {
 
-  def reverse:MainDefaults = copy(msgs = msgs.reverse)
+  def reverseMsgs:MainDefaults = copy(msgs = msgs.reverse)
 }
 
 case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
@@ -274,7 +275,7 @@ object Uccm {
     }
   }
 
-  def panic(text:String) = {
+  def panic(text:String) : Unit = {
     System.err.println(text)
     System.exit(1)
   }
@@ -306,7 +307,7 @@ object Uccm {
           }
           case _ => dflts.copy(msgs = s"unknown default $tag, pragma ignored" :: dflts.msgs)
         }
-    }} .reverse
+    }} .reverseMsgs
 
     defaults.msgs.foreach { System.err.println }
 
@@ -339,8 +340,6 @@ object Uccm {
           None
       case None => Some(s)
     }
-
-    case class Component ( home: Option[String] = None, info: Option[String] = None, download:Option[String] = None )
 
     val components = boardPragmas.foldLeft( Map[String,Component]() ) {
       (components,prag) => prag match {
@@ -416,7 +415,7 @@ object Uccm {
       val gccPreprocCmdline = cc + " -E " + xcflags.map{expandHome}.mkString(" ") + " " + mainFilePath
 
       verbose(gccPreprocCmdline)
-      if ( 0 != (gccPreprocCmdline #> tempFile!) )
+      if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
       Pragmas.extractFrom(tempFile).foldLeft(BuildScript(targetCompiler,List(s"-I${uccmHome.getCanonicalPath}"),List(mainFilePath))) {
@@ -483,7 +482,7 @@ object Uccm {
             } ++
             List(srcFile.getCanonicalPath, "-o", objFile.getCanonicalPath)).mkString(" ")
           verbose(gccCmdline)
-          if (0 != (gccCmdline !))
+          if (0 != gccCmdline.!)
             panic(s"failed to compile ${srcFile.getName}")
         }
         objFile.getName :: ls
