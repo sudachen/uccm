@@ -8,6 +8,7 @@ case class UccmHome(tag:String, value:String) extends UccmPragma
 case class UccmBoard(tag:String, value:String) extends UccmPragma
 case class UccmXcflags(tag:String, value:String) extends UccmPragma
 case class UccmCflags(value:String) extends UccmPragma
+case class UccmLdflags(value:String) extends UccmPragma
 case class UccmRequire(tag:String,value:String) extends UccmPragma
 case class UccmAppend(tag:String, value:String) extends UccmPragma
 case class UccmDefault(tag:String, value:String) extends UccmPragma
@@ -28,6 +29,7 @@ object Pragmas {
     val rBoard   = "#pragma\\s*uccm\\s*board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
     val rHome    = "#pragma\\s*uccm\\s*home\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
+    val rLdflags = "#pragma\\s*uccm\\s*ldflags\\s*\\+?=\\s*(.+)$".r
     val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*=\\s*(.+)$".r
     val rFile    = "#pragma\\s*uccm\\s*file\\(([\\.\\-\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rDefault = "#pragma\\s*uccm\\s*default\\((\\w+)\\)\\s*=\\s*(.+)$".r
@@ -47,6 +49,7 @@ object Pragmas {
       case rBoard(tag,value) => Some(UccmBoard(tag,ns(value)))
       case rHome(tag,value) => Some(UccmHome(tag,ns(value)))
       case rCflags(value) => Some(UccmCflags(value))
+      case rLdflags(value) => Some(UccmLdflags(value))
       case rRequire(tag,value) => Some(UccmRequire(tag,ns(value)))
       case rFile(tag,value) => Some(UccmAppend(tag,ns(value)))
       case rDefault(tag,value) => Some(UccmDefault(tag,ns(value)))
@@ -108,7 +111,8 @@ case class BuildScript(ccTool:Compiler.Value,
                        libraries:List[String] = Nil,
                        generated:List[(String,String)] = Nil,
                        begin:List[String] = Nil,
-                       end:List[String] = Nil ) {
+                       end:List[String] = Nil,
+                       ldflags:List[String] = Nil) {
   def toXML : scala.xml.Node = {
     <uccm>
       <cctool>
@@ -120,6 +124,12 @@ case class BuildScript(ccTool:Compiler.Value,
           {i}
         </flag>} }
       </cflags>
+      <ldflags>
+        {ldflags map { i =>
+        <flag>
+          {i}
+        </flag>} }
+      </ldflags>
       <sources>
         {sources map { i =>
         <file>
@@ -159,11 +169,12 @@ object BuildScript {
     def ns(s:String) = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
     BuildScript(
       Compiler.fromString(ns((xml\"cctool" ).text)).get,
-      (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
-      (xml\"sources"\"file").map{ x => ns(x.text)}.toList,
-      (xml\"modules"\"file").map{ x => ns(x.text)}.toList,
-      (xml\"libraries"\"file").map{ x => ns(x.text)}.toList,
-      (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
+      cflags = (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
+      ldflags = (xml\"ldflags"\"flag").map{ x => ns(x.text)}.toList,
+      sources = (xml\"sources"\"file").map{ x => ns(x.text)}.toList,
+      modules = (xml\"modules"\"file").map{ x => ns(x.text)}.toList,
+      libraries = (xml\"libraries"\"file").map{ x => ns(x.text)}.toList,
+      generated = (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
     )}
 }
 
@@ -283,11 +294,11 @@ object Prog {
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
     val mainFile : File = cmdlOpts.mainFile match {
-      case Some(f) if f.isAbsolute => f
-      case Some(f) => f.getAbsoluteFile
+      case Some(f) => if ( f.isAbsolute ) f else f.getAbsoluteFile
       case None => new File("main.c").getAbsoluteFile
     }
 
+    val projectDir = mainFile.getParentFile
     def verbose(s:String) = if (cmdlOpts.verbose) println(s)
 
     if ( !mainFile.exists )
@@ -307,6 +318,7 @@ object Prog {
           }
           case _ => dflts.copy(msgs = s"unknown default $tag, pragma ignored" :: dflts.msgs)
         }
+        case _ => dflts
     }} .reverseMsgs
 
     defaults.msgs.foreach { System.err.println }
@@ -328,9 +340,23 @@ object Prog {
     )
 
     if ( !buildDir.exists ) buildDir.mkdirs()
-
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
+    val targetElf = new File(buildDir,"firmware.elf")
+    val targetHex = new File(buildDir,"firmware.hex")
+    val targetBin = new File(buildDir,"firmware.bin")
+
+    if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
+      FileUtils.deleteDirectory(objDir)
+      FileUtils.deleteDirectory(incDir)
+      List(targetElf,targetHex,targetBin).foreach{ f =>
+        if ( f.exists )
+          f.delete()
+      }
+    }
+
+    if ( !objDir.exists ) objDir.mkdirs()
+    if ( !incDir.exists ) incDir.mkdirs()
 
     def expandEnv(s:String):Option[String] = "(\\%(\\w+)\\%)".r findFirstMatchIn s match {
       case Some(m) =>
@@ -359,6 +385,7 @@ object Prog {
       }
     } +
       ("inc" -> Component(home = Some(incDir.getCanonicalPath))) +
+      ("obj" -> Component(home = Some(objDir.getCanonicalPath))) +
       ("src" -> Component(home = Some(mainFile.getParentFile.getCanonicalPath)))
 
     def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
@@ -398,17 +425,9 @@ object Prog {
       }
     } .map{expandHome} .reverse
 
-    if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
-      FileUtils.deleteDirectory(objDir)
-      FileUtils.deleteDirectory(incDir)
-    }
-
-    if ( !objDir.exists ) objDir.mkdirs()
-    if ( !incDir.exists ) incDir.mkdirs()
-
     val buildScriptFile = new File(buildDir,"script.xml")
 
-    def extractFromPreprocessor = {
+    def extractFromPreprocessor : BuildScript = {
       val cc = expandHome(Compiler.ccPath(targetCompiler))
       val tempFile = File.createTempFile("uccm",".gcc.i")
       val mainFilePath = mainFile.getCanonicalPath
@@ -426,6 +445,7 @@ object Prog {
             case _ => bs
           }
           case UccmCflags(value) => bs.copy(cflags = value :: bs.cflags)
+          case UccmLdflags(value) => bs.copy(ldflags = value :: bs.ldflags)
           case UccmBoard(`targetBoard`,value) => bs.copy(cflags = value :: bs.cflags)
           case UccmBoard("*",value) => bs.copy(cflags = value :: bs.cflags)
           case UccmRequire("module",value) => bs.copy(modules = value :: bs.modules)
@@ -440,6 +460,7 @@ object Prog {
         case bs => bs.copy(
           generated = bs.generated.reverse,
           cflags = bs.cflags.map{expandHome}.reverse,
+          ldflags = bs.ldflags.map{expandHome}.reverse,
           sources = bs.begin.map{expandHome}.reverse ++
                     bs.sources.map{expandHome}.reverse ++
                     bs.end.map{expandHome},
@@ -470,24 +491,41 @@ object Prog {
     println(s"uccm is using ${buildScript.ccTool} compiler")
     val cc = expandHome(Compiler.ccPath(buildScript.ccTool))
 
-    val objects = buildScript.sources.foldLeft(List[String]()) { (ls,source) => {
+    def compile(ls:List[String],source:String):List[String] = {
       val srcFile = new File(source)
-        val objFileName = srcFile.getName + ".obj"
-        val objFile = new File(objDir,objFileName)
-        if ( cmdlOpts.targets.contains(Target.Rebuild) ||
-          !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
-          val gccCmdline: String = (List(cc, "-c ") ++
-            buildScript.cflags.map {
-              expandHome
-            } ++
-            List(srcFile.getCanonicalPath, "-o", objFile.getCanonicalPath)).mkString(" ")
-          verbose(gccCmdline)
-          if (0 != gccCmdline.!)
-            panic(s"failed to compile ${srcFile.getName}")
-        }
-        objFile.getName :: ls
-    }}
+      val objFileName = srcFile.getName + ".obj"
+      val objFile = new File(objDir,objFileName)
+      if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+        !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
+        val gccCmdline: String = (List(cc, "-c ") ++
+          buildScript.cflags.map{expandHome} ++
+          List(srcFile.getCanonicalPath, "-o", objFile.getCanonicalPath)).mkString(" ")
+        verbose(gccCmdline)
+        if (0 != gccCmdline.!)
+          panic(s"failed to compile ${srcFile.getName}")
+      }
+      objFile.getName :: ls
+    }
 
+    val objects = buildScript.sources.foldLeft(List[String]()) { compile }
+    val modules = buildScript.modules.foldLeft(List[String]()) { compile }
+
+    def link() = {
+      val objFiles = ( objects ++ modules ).map{fn => new File(objDir,fn)}
+      val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
+        !targetElf.exists ||
+        objFiles.foldLeft( false ) {(f,obj) => f || FileUtils.isFileOlder(targetElf,obj)}
+      if ( haveToRelink ) {
+        val gccCmdline: String = (List(cc) ++
+          buildScript.ldflags.map{expandHome} ++ objFiles ++
+          List("-o", targetElf.getCanonicalPath)).mkString(" ")
+        verbose(gccCmdline)
+        if (0 != gccCmdline.!)
+          panic(s"failed to link ${targetElf.getName}")
+      }
+    }
+
+    link()
     println("succeeded")
   }
 

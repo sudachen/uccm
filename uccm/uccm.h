@@ -19,7 +19,12 @@
 
 #pragma uccm board(*)= -D_UCCM_VERSION=100
 #pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161
-#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -Wl,--gc-sections -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
+#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
+
+#ifdef __keil_v5
+#else
+#pragma uccm ldflags+= -mthumb -Wl,--gc-sections
+#endif
 
 #include <stdint.h>
 #include "macro.h"

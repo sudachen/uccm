@@ -11,15 +11,17 @@
 #pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/arm/startup_stm32f303xc.s
 #else // assume gcc
 #pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s
-#pragma uccm require(ldscript) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
+#pragma uccm ldflags+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
 #endif
 
 #pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c
+#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal.c
+#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_gpio.c
 #pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_rcc.c
-#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_ex.c
 
 #pragma uccm file(stm32f3xx_hal_conf.h) += \
 #pragma once\n\
+#define assert_param(expr) ((void)0U)\n\
 #define __STM32F3xx_HAL_CONF_H\n\
 #define HSE_VALUE ((uint32_t)8000000)\n\
 #define HSE_STARTUP_TIMEOUT ((uint32_t)100)\n\
@@ -41,6 +43,70 @@
 #define HAL_FLASH_MODULE_ENABLE\n\
 #define HAL_PWR_MODULE_ENABLED\n\
 #define HAL_CORTEX_MODULE_ENABLED\n\
+#define HAL_GPIO_MODULE_ENABLED\n\
+#include <stm32f3xx_hal_gpio.h>\n\
+#include <stm32f3xx_hal_rcc.h>\n\
+#include <stm32f3xx_hal_dma.h>\n\
+#include <stm32f3xx_hal_cortex.h>\n\
+#include <stm32f3xx_hal_flash.h>\n\
+#include <stm32f3xx_hal_pwr.h>\n\
+
+/*
+#define HAL_ADC_MODULE_ENABLED
+#include <stm32f3xx_hal_adc.h>
+#define HAL_CAN_MODULE_ENABLED
+#include <stm32f3xx_hal_can.h>
+#define HAL_CEC_MODULE_ENABLED
+#include <stm32f3xx_hal_cec.h>
+#define HAL_COMP_MODULE_ENABLED
+#include <stm32f3xx_hal_comp.h>
+#define HAL_CRC_MODULE_ENABLED
+#include <stm32f3xx_hal_crc.h>
+#define HAL_DAC_MODULE_ENABLED
+#include <stm32f3xx_hal_dac.h>
+#define HAL_SRAM_MODULE_ENABLED
+#include <stm32f3xx_hal_sram.h>
+#define HAL_NOR_MODULE_ENABLED
+#include <stm32f3xx_hal_nor.h>
+#define HAL_NAND_MODULE_ENABLED
+#include <stm32f3xx_hal_nand.h>
+#define HAL_PCCARD_MODULE_ENABLED
+#include <stm32f3xx_hal_pccard.h>
+#define HAL_HRTIM_MODULE_ENABLED
+#include <stm32f3xx_hal_hrtim.h>
+#define HAL_I2C_MODULE_ENABLED
+#include <stm32f3xx_hal_i2c.h>
+#define HAL_I2S_MODULE_ENABLED
+#include <stm32f3xx_hal_i2s.h>
+#define HAL_IRDA_MODULE_ENABLED
+#include <stm32f3xx_hal_irda.h>
+#define HAL_IWDG_MODULE_ENABLED
+#include <stm32f3xx_hal_iwdg.h>
+#define HAL_OPAMP_MODULE_ENABLED
+#include <stm32f3xx_hal_opamp.h>
+#define HAL_PCD_MODULE_ENABLED
+#include <stm32f3xx_hal_pcd.h>
+#define HAL_RTC_MODULE_ENABLED
+#include <stm32f3xx_hal_rtc.h>
+#define HAL_SDADC_MODULE_ENABLED
+#include <stm32f3xx_hal_sdadc.h>
+#define HAL_SMARTCARD_MODULE_ENABLED
+#include <stm32f3xx_hal_smartcard.h>
+#define HAL_SMBUS_MODULE_ENABLED
+#include <stm32f3xx_hal_smbus.h>
+#define HAL_SPI_MODULE_ENABLED
+#include <stm32f3xx_hal_spi.h>
+#define HAL_TIM_MODULE_ENABLED
+#include <stm32f3xx_hal_tim.h>
+#define HAL_TSC_MODULE_ENABLED
+#include <stm32f3xx_hal_tsc.h>
+#define HAL_UART_MODULE_ENABLED
+#include <stm32f3xx_hal_uart.h>
+#define HAL_USART_MODULE_ENABLED
+#include <stm32f3xx_hal_usart.h>
+#define HAL_WWDG_MODULE_ENABLED
+#include <stm32f3xx_hal_wwdg.h>
+*/
 
 #define UCCM_LL_INCLUDE(File) <uccm/stm32f3/ll_##File>
 
