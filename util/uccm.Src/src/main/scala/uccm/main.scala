@@ -1,4 +1,4 @@
-package uccm
+package com.sudachen.uccm
 import java.io.{File,FileWriter}
 import org.apache.commons.io.FileUtils
 import sys.process._
@@ -188,7 +188,7 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        verbose:  Boolean = false
                       )
 
-object Uccm {
+object Prog {
 
   def main(argv: Array[String]): Unit = {
     val cmdlParser = new scopt.OptionParser[CmdlOptions]("uccm") {
