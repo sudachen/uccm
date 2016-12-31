@@ -2,8 +2,8 @@
 #pragma once
 #include "uccm.h"
 
-typedef struct { uint8_t leg_no; } uccm_leg_t;
-#define UCCM_LEG(Group,Leg) ((uccm_leg_t){(Group-'A')<<4 | Leg})
+typedef struct { uint8_t leg_no; } UcLeg;
+#define UCCM_LEG(Group,Leg) ((UcLeg){(Group-'A')<<4 | Leg})
 
 #define PA0  UCCM_LEG('A',0)
 #define PA1  UCCM_LEG('A',1)
@@ -97,9 +97,13 @@ typedef enum {
     LEG_FLOAT = 0,
     LEG_PULL_UP,
     LEG_PULL_DOWN,
-} uccm_gpio_input_t;
+} UcInputLegOpt;
 
 typedef enum {
     LEG_PUSH_PULL = 0,
     LEG_OPEN_DRAIN,
-} uccm_gpio_output_t;
+} UcOutputLegOpt;
+
+#include UCCM_LL_INCLUDE(leg.h)
+
+

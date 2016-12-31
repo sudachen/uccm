@@ -396,10 +396,10 @@ object Prog {
         case _ => components
       }
     } +
-      ("@inc" -> Component(home = Some(incDir.getCanonicalPath))) +
-      ("@obj" -> Component(home = Some(objDir.getCanonicalPath))) +
-      ("@build" -> Component(home = Some(buildDir.getCanonicalPath))) +
-      ("@src" -> Component(home = Some(mainFile.getParentFile.getCanonicalPath)))
+      (("@inc" -> Component(home = Some(incDir.getCanonicalPath))),
+      ("@obj" -> Component(home = Some(objDir.getCanonicalPath))),
+      ("@build" -> Component(home = Some(buildDir.getCanonicalPath))),
+      ("@src" -> Component(home = Some(mainFile.getParentFile.getCanonicalPath))))
 
     def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
 
@@ -522,30 +522,28 @@ object Prog {
 
     val objects = buildScript.sources.foldLeft(List[String]()) { compile }
     val modules = buildScript.modules.foldLeft(List[String]()) { compile }
+    val ld = expandHome(Compiler.ldPath(buildScript.ccTool))
+    val objFiles = ( objects ++ modules ).map{fn => new File(objDir,fn)}
+    val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
+      !targetElf.exists ||
+      objFiles.foldLeft( false ) {(f,obj) => f || FileUtils.isFileOlder(targetElf,obj)}
 
-    {
-      val ld = expandHome(Compiler.ldPath(buildScript.ccTool))
-      val objFiles = ( objects ++ modules ).map{fn => new File(objDir,fn)}
-      val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
-        !targetElf.exists ||
-        objFiles.foldLeft( false ) {(f,obj) => f || FileUtils.isFileOlder(targetElf,obj)}
-      if ( haveToRelink ) {
-        List(targetBin,targetHex,targetElf).foreach{f => if (f.exists) f.delete}
-        val gccCmdline = (List(ld) ++
-          buildScript.ldflags.map{expandHome} ++ objFiles ++
-          List("-o", targetElf.getCanonicalPath)).mkString(" ")
-        verbose(gccCmdline)
-        if (0 != gccCmdline.!)
-          panic(s"failed to link ${targetElf.getName}")
-        val toHexCmdl = expandHome(Compiler.elfToHexCmdl(buildScript.ccTool,targetElf,targetHex))
-        verbose(toHexCmdl)
-        if (0 != toHexCmdl.!)
-          panic(s"failed to generate ${targetHex.getName}")
-        val toBinCmdl = expandHome(Compiler.elfToBinCmdl(buildScript.ccTool,targetElf,targetBin))
-        verbose(toBinCmdl)
-        if (0 != toBinCmdl.!)
-          panic(s"failed to generate ${targetBin.getName}")
-      }
+    if ( haveToRelink ) {
+      List(targetBin,targetHex,targetElf).foreach{f => if (f.exists) f.delete}
+      val gccCmdline = (List(ld) ++
+        buildScript.ldflags.map{expandHome} ++ objFiles ++
+        List("-o", targetElf.getCanonicalPath)).mkString(" ")
+      verbose(gccCmdline)
+      if (0 != gccCmdline.!)
+        panic(s"failed to link ${targetElf.getName}")
+      val toHexCmdl = expandHome(Compiler.elfToHexCmdl(buildScript.ccTool,targetElf,targetHex))
+      verbose(toHexCmdl)
+      if (0 != toHexCmdl.!)
+        panic(s"failed to generate ${targetHex.getName}")
+      val toBinCmdl = expandHome(Compiler.elfToBinCmdl(buildScript.ccTool,targetElf,targetBin))
+      verbose(toBinCmdl)
+      if (0 != toBinCmdl.!)
+        panic(s"failed to generate ${targetBin.getName}")
     }
 
     println("succeeded")
@@ -582,10 +580,5 @@ object Prog {
       Pragmas.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ boardPragmas.get
     else
       Nil
-  }
-
-  def executeBuildScript(buildScript:BuildScript, targets:Set[Target.Value]): Unit =
-  {
-
   }
 }

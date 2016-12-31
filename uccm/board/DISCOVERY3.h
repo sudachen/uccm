@@ -116,19 +116,20 @@
 #include <stm32f3xx.h>
 
 #define UCCM_BOARD_LEDS \
-    (0,PE8, LEG_PUSH_PULL),(1,PE9, LEG_PUSH_PULL),(2,PE10,LEG_PUSH_PULL),(3,PE11,LEG_PUSH_PULL),\
-    (4,PE12,LEG_PUSH_PULL),(5,PE13,LEG_PUSH_PULL),(6,PE14,LEG_PUSH_PULL),(7,PE15,LEG_PUSH_PULL)
+    (r0,PE8, LEG_PUSH_PULL),(r1,PE9, LEG_PUSH_PULL),(r2,PE10,LEG_PUSH_PULL),(r3,PE11,LEG_PUSH_PULL),\
+    (r4,PE12,LEG_PUSH_PULL),(r5,PE13,LEG_PUSH_PULL),(r6,PE14,LEG_PUSH_PULL),(r7,PE15,LEG_PUSH_PULL)
 
 #define UCCM_BOARD_LEDS_COUNT 8
 #define UCCM_BOARD_BUTTONS (0, PA0, LEG_FLOAT)
 #define UCCM_BOARD_BUTTONS_COUNT 1
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
 
-//#include "../leds.h"
+#include "../leds.h"
 //#include "../buttons.h"
 
 __Inline
-void ucBoard_Setup()
+void ucSetup_Board()
 {
+    ucSetup_BoardLEDs();
 }
 

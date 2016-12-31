@@ -29,6 +29,7 @@
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "macro.h"
 
 #define __Inline static inline
