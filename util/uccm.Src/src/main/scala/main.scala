@@ -218,7 +218,7 @@ object Prog {
 
   def main(argv: Array[String]): Unit = {
     val cmdlParser = new scopt.OptionParser[CmdlOptions]("uccm") {
-      head("uC cortex-m build manager", "1.0")
+      head("Alexey Sudachen' uC cortex-m build manager, goo.gl/a9irI7")
       help("help").
         text("show this help and exit")
 
@@ -262,19 +262,19 @@ object Prog {
 
       opt[Unit]("gcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.GCC))).
-        text("use gcc compiler")
+        text("use ARM-NONE-EABI GNU C compiler")
 
       opt[Unit]("armcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC))).
-        text("use gcc compiler")
+        text("use KeilV5 armcc compiler")
 
       opt[Unit]("stlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.STLINK))).
-        text("use stlink debugger")
+        text("use STM ST-Link debugger")
 
       opt[Unit]("jlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.JLINK))).
-        text("use jlink debugger")
+        text("use SEGGER J-Link debugger")
 
       arg[File]("main.c").optional().
         action( (x,c) => c.copy(mainFile = Some(x))).
@@ -439,6 +439,8 @@ object Prog {
     } .map{expandHome} .reverse
 
     val buildScriptFile = new File(buildDir,"script.xml")
+    if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
+      println(s"uccm is using ${Compiler.stringify(targetCompiler)} compiler")
 
     def extractFromPreprocessor : BuildScript = {
       val cc = expandHome(Compiler.ccPath(targetCompiler))
@@ -446,6 +448,7 @@ object Prog {
       val mainFilePath = mainFile.getCanonicalPath
       val gccPreprocCmdline = cc + " -E " + xcflags.map{expandHome}.mkString(" ") + " " + mainFilePath
 
+      println(s"preprocessing main C-file ...")
       verbose(gccPreprocCmdline)
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
@@ -491,6 +494,9 @@ object Prog {
 
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
       scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
+    else
+      println(s"uccm is using ${buildScript.ccTool} compiler")
+
 
     if ( cmdlOpts.targets.contains(Target.Rebuild) )
       buildScript.generated.foreach {
@@ -501,8 +507,6 @@ object Prog {
           wr.close()
       }
 
-    println(s"uccm is using ${buildScript.ccTool} compiler")
-
     def compile(ls:List[String],source:String):List[String] = {
       val cc = expandHome(Compiler.ccPath(buildScript.ccTool))
       val srcFile = new File(source)
@@ -510,6 +514,7 @@ object Prog {
       val objFile = new File(objDir,objFileName)
       if ( cmdlOpts.targets.contains(Target.Rebuild) ||
         !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
+        println(s"compiling ${srcFile.getName} ...")
         val gccCmdline: String = (List(cc, "-c ") ++
           buildScript.cflags.map{expandHome} ++
           List(srcFile.getCanonicalPath, "-o", objFile.getCanonicalPath)).mkString(" ")
@@ -529,6 +534,7 @@ object Prog {
       objFiles.foldLeft( false ) {(f,obj) => f || FileUtils.isFileOlder(targetElf,obj)}
 
     if ( haveToRelink ) {
+      println("linking ...")
       List(targetBin,targetHex,targetElf).foreach{f => if (f.exists) f.delete}
       val gccCmdline = (List(ld) ++
         buildScript.ldflags.map{expandHome} ++ objFiles ++
