@@ -21,9 +21,22 @@
 #pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161
 #pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
 
-#ifdef __keil_v5
-#pragma uccm ldflags+= --info summarysizes --map --xref --callgraph --symbols --info sizes --info totals --info unused --info veneers --list [@build]/firmware.map
+#ifdef _DEBUG
+#pragma uccm cflags+= -g -O0
+#elif defined _RELEASE
+#pragma uccm cflags+= -g -O2
+#endif
 
+#ifdef __keil_v5
+#pragma uccm cflags+= --apcs interwork --split_sections -D__UVISION_VERSION="520" --asm --interleave --asm-dir [@obj]
+#pragma uccm ldflags+= --strict --scatter [@inc]/firmware.sct 
+#pragma uccm ldflags+= --info summarysizes --map --xref --callgraph --symbols --info sizes --info totals --info unused --info veneers --list [@build]/firmware.map
+#pragma uccm asflags+= --apcs=interwork --pd "__UVISION_VERSION SETA 520"
+#ifdef USE_MICROLIB
+#pragma uccm cflags+= -D__MICROLIB
+#pragma uccm ldflags+= --library_type=microlib 
+#pragma uccm asflags+= --pd "__MICROLIB SETA 1"
+#endif
 #else
 #pragma uccm ldflags+= -mthumb -Wl,--gc-sections,--cref,-Map=[@build]/firmware.map
 #endif

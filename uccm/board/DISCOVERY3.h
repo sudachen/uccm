@@ -2,24 +2,45 @@
 #pragma once
 #include "../uccm.h"
 
+#pragma uccm alias(CMSIS) = [cubefx_fw_f3]/Drivers/CMSIS
+#pragma uccm alias(STM32F3XX) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx
+#pragma uccm alias(STM32HAL) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver
+
 #pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h -DSTM32F303xC
-#pragma uccm xcflags(armcc)+= --cpu Cortex-M4
+#pragma uccm xcflags(armcc)+= --cpu Cortex-M4.fp
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
-#pragma uccm xcflags(*)+= -I[@inc] -I[cubefx_fw_f3]/Drivers/CMSIS/Include -I[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I[cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Inc
+#pragma uccm xcflags(*)+= -I[@inc] -I "{CMSIS}/Include" -I "{STM32F3XX}/Include" -I "{STM32HAL}/Inc"
 
 #ifdef __keil_v5
-#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/arm/startup_stm32f303xc.s
-#pragma uccm ldflags+= --cpu Cortex-M4
+#pragma uccm require(begin) = {STM32F3XX}/Source/Templates/arm/startup_stm32f303xc.s
+#pragma uccm ldflags+= --cpu Cortex-M4.fp 
+#pragma uccm asflags+= --cpu Cortex-M4.fp --pd "STM32F303xC SETA 1"
 #else // assume gcc
-#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/startup_stm32f303xc.s
-#pragma uccm ldflags+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T[cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
+#pragma uccm require(begin) = {STM32F3XX}/Source/Templates/gcc/startup_stm32f303xc.s
+#pragma uccm ldflags+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T{STM32F3XX}/Source/Templates/gcc/linker/STM32F303XC_FLASH.ld
 #endif
 
-#pragma uccm require(begin) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx/Source/Templates/system_stm32f3xx.c
-#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal.c
-#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_gpio.c
-#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_rcc.c
-#pragma uccm require(module) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_cortex.c
+#pragma uccm require(begin)  = {STM32F3XX}/Source/Templates/system_stm32f3xx.c
+#pragma uccm require(module) = {STM32HAL}/Src/stm32f3xx_hal.c
+#pragma uccm require(module) = {STM32HAL}/Src/stm32f3xx_hal_gpio.c
+#pragma uccm require(module) = {STM32HAL}/Src/stm32f3xx_hal_rcc.c
+#pragma uccm require(module) = {STM32HAL}/Src/stm32f3xx_hal_cortex.c
+
+#ifdef __keil_v5
+#pragma uccm file(firmware.sct)+= \
+LR_IROM1 0x08000000 0x00040000 {    ; load region size_region\n\
+  ER_IROM1 0x08000000 0x00040000 {  ; load address = execution address\n\
+   *.obj (RESET, +First)\n\
+   *(InRoot$$Sections)\n\
+   .ANY (+RO)\n\
+  }\n\
+  RW_IRAM1 0x20000000 UNINIT 0x00010000 {  ; RW data\n\
+   .ANY (+RW +ZI)\n\
+  }\n\
+}\n\
+
+#pragma uccm ldflags+= --keep=startup_*
+#endif
 
 #pragma uccm file(stm32f3xx_hal_conf.h) += \
 #pragma once\n\
