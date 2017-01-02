@@ -147,7 +147,7 @@ LR_IROM1 0x08000000 0x00040000 {    ; load region size_region\n\
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
 
 #include "../leds.h"
-//#include "../buttons.h"
+#include "../buttons.h"
 
 __Inline
 void ucSetup_Board()

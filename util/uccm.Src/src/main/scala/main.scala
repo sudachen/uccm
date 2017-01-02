@@ -11,7 +11,7 @@ import qteproj.QtProj
 import pragmas._
 
 object Target extends Enumeration {
-  val Rebuild, Build, Erase, Flash, Connect, Reset, Qte = Value
+  val Clean, Rebuild, Build, Erase, Flash, Connect, Reset, Qte = Value
 }
 
 case class Component ( home: Option[String] = None,
@@ -51,8 +51,16 @@ object Prog {
         text("verbose output")
 
       opt[Unit]("qte").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
         text("generate QTcreator generic project")
+
+      opt[Unit]("clean").
+        action( (_,c) => c.copy(targets = c.targets + Target.Clean - Target.Build)).
+        text("remove intermediate files and target firmware")
+
+      opt[Unit]("build").
+        action( (_,c) => c.copy(targets = c.targets + Target.Build)).
+        text("build project, it's the action by default")
 
       opt[Unit]("rebuild").
         action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
@@ -203,6 +211,9 @@ object Prog {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles{_.isFile}.foreach{_.delete}
+    } else if ( cmdlOpts.targets.contains(Target.Clean) && buildDir.exists ) {
+      FileUtils.deleteDirectory(objDir)
+      buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
 
     if ( !objDir.exists ) objDir.mkdirs()
@@ -377,7 +388,7 @@ object Prog {
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
       scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
     else
-      println(s"uccm is using ${buildScript.ccTool} compiler")
+      println(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
 
 
     if ( cmdlOpts.targets.contains(Target.Rebuild) )
@@ -420,7 +431,7 @@ object Prog {
     if ( cmdlOpts.targets.contains(Target.Qte) )
       QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
 
-    else {
+    else if ( cmdlOpts.targets.contains(Target.Build) ) {
 
       val objects = buildScript.sources.foldLeft(List[String]()) {
         compile

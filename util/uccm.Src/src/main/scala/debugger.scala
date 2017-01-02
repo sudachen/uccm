@@ -2,6 +2,7 @@ package com.sudachen.uccm.debugger
 
 object Debugger extends Enumeration {
   val STLINK, JLINK = Value
+
   def fromString(name:String): Option[Value] = name match {
     case "stlink" => Some(STLINK)
     case "jlink" => Some(JLINK)
