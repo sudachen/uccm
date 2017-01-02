@@ -10,8 +10,8 @@
 #define C_CONCAT2(_0,_1)        C_COMPOSE2(_0,_1)
 #define C_CONCAT3(_0,_1,_2)     C_COMPOSE3(_0,_1,_2)
 #define C_CONCAT4(_0,_1,_2,_3)	C_COMPOSE4(_0,_1,_2,_3)
-#define C_CONSTSTR(_)       #_
-#define C_STR(_)            C_CONSTSTR(_)
+#define C_CONSTSTR(_)           #_
+#define C_STR(_)                C_CONSTSTR(_)
 
 #define C_ARGS_COUNT_(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,...) _15
 #define C_ARGS_COUNT(...) C_ARGS_COUNT_(__VA_ARGS__,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0)
@@ -34,7 +34,7 @@
 #define C_APPLY_12(_Q,Spacer,_0,...) _Q(_0) Spacer() C_APPLY_11(_Q,Spacer,__VA_ARGS__)
 #define C_APPLY_13(_Q,Spacer,_0,...) _Q(_0) Spacer() C_APPLY_12(_Q,Spacer,__VA_ARGS__)
 #define C_APPLY_14(_Q,Spacer,_0,...) _Q(_0) Spacer() C_APPLY_13(_Q,Spacer,__VA_ARGS__)
-#define C_APPLY(_Q,Spacer,...) C_CONCAT2(C_APPLY_,C_ARGS_COUNT(__VA_ARGS__))(_Q,Spacer,__VA_ARGS__)
+#define C_APPLY(_Q,Spacer,...)       C_CONCAT2(C_APPLY_,C_ARGS_COUNT(__VA_ARGS__))(_Q,Spacer,__VA_ARGS__)
 
 #define C_GETITEM_0(_0,...) _0
 #define C_GETITEM_1(_0,_1,...) _1

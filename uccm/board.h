@@ -2,9 +2,7 @@
 #pragma once
 #include "uccm.h"
 
-#define UCCM_BOARD_INCLUDE_S(BoardFile) #BoardFile
-#define UCCM_BOARD_INCLUDE_(File) UCCM_BOARD_INCLUDE_S(board/File)
-#define UCCM_BOARD_INCLUDE(File) UCCM_BOARD_INCLUDE_(File)
+#define UCCM_BOARD_INCLUDE(File) C_STR(board/File)
 
 #if defined _BOARD_FILE
 #include UCCM_BOARD_INCLUDE(_BOARD_FILE)

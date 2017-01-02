@@ -10,6 +10,7 @@
 #pragma uccm xcflags(armcc)+= --cpu Cortex-M4.fp
 #pragma uccm xcflags(gcc)+= -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 #pragma uccm xcflags(*)+= -I[@inc] -I "{CMSIS}/Include" -I "{STM32F3XX}/Include" -I "{STM32HAL}/Inc"
+#pragma uccm cflags+= -DUSE_HAL_DRIVER
 
 #ifdef __keil_v5
 #pragma uccm require(begin) = {STM32F3XX}/Source/Templates/arm/startup_stm32f303xc.s

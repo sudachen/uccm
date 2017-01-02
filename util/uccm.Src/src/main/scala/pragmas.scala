@@ -18,6 +18,15 @@ case class UccmInfo(tag:String, value:String) extends UccmPragma
 case class UccmDownload(tag:String, value:String) extends UccmPragma
 
 object Pragmas {
+
+  def extractFromTempFile(tempFile:File) : Stream[UccmPragma] = {
+    def js(s: Stream[UccmPragma]) : Stream[UccmPragma] = s match {
+      case xs #:: t => xs #:: js(t)
+      case _ => tempFile.delete; Stream.empty
+    }
+    js(extractFrom(tempFile))
+  }
+
   def extractFrom(file:File) : Stream[UccmPragma] = {
     val f = io.Source.fromFile(file)
 

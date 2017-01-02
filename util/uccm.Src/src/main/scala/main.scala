@@ -32,7 +32,8 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        compiler: Option[Compiler.Value] = None,
                        debugger: Option[Debugger.Value] = None,
                        mainFile: Option[File] = None,
-                       verbose:  Boolean = false
+                       verbose:  Boolean = false,
+                       cflags:  List[String] = Nil
                       )
 
 object Prog {
@@ -85,6 +86,10 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("set target board")
 
+      opt[String]('D',"define").
+        action( (x,c) => c.copy(cflags = ("-D"+x)::c.cflags)).
+        text("add macor definition to compiler cflags")
+
       opt[Unit]("gcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.GCC))).
         text("use ARM-NONE-EABI GNU C compiler")
@@ -92,6 +97,10 @@ object Prog {
       opt[Unit]("armcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC))).
         text("use KeilV5 armcc compiler")
+
+      opt[Unit]("armcc-microlib").
+        action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC),cflags = "-DUSE_MICROLIB"::c.cflags)).
+        text("use KeilV5 armcc compiler with C-microlib")
 
       opt[Unit]("stlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.STLINK))).
@@ -284,7 +293,7 @@ object Prog {
       }
     }
 
-    val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: Nil ) {
+    val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
       (xcflags,prag) => prag match {
         case UccmXcflags(x,value) => Compiler.fromString(x) match {
           case Some(`targetCompiler`) => value :: xcflags
@@ -303,7 +312,7 @@ object Prog {
 
     def extractFromPreprocessor : BuildScript = {
       val cc = expandHome(Compiler.ccPath(targetCompiler))
-      val tempFile = File.createTempFile("uccm",".gcc.i")
+      val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(targetCompiler)}.i")
       val mainFilePath = mainFile.getPath
       val optSelector = cmdlOpts.buildConfig match {
         case BuildConfig.Release => " -D_RELEASE "
@@ -321,9 +330,9 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
-      Pragmas.extractFrom(tempFile).foldLeft(
+      Pragmas.extractFromTempFile(tempFile).foldLeft(
         BuildScript(targetCompiler,targetDebugger,cmdlOpts.buildConfig,
-          List(s"-I{UCCM}",optSelector),
+          s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
           case UccmXcflags(x,value) => Compiler.fromString(x) match {
@@ -409,7 +418,7 @@ object Prog {
     }
 
     if ( cmdlOpts.targets.contains(Target.Qte) )
-      QtProj.generate(mainFile,buildScript,buildDir,expandHome)
+      QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
 
     else {
 
