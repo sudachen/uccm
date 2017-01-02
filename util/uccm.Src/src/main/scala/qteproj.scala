@@ -1,17 +1,15 @@
 package com.sudachen.uccm.qteproj
 
-import com.sudachen.uccm.buildscript.BuildScript
+import com.sudachen.uccm.compiler.Compiler
+import com.sudachen.uccm.buildscript.{BuildScript,BuildConfig}
 import java.io.{File, FileWriter}
+import sys.process._
 
 object QtProj {
 
-  def generate(mainFile:File,buildScript:BuildScript) : Unit = {
+  def generate(mainFile:File, buildScript:BuildScript, buildDir:File, expand: String => String ) : Unit = {
 
-    def unquote(s:String) =
-      if ( s.startsWith("\"") )
-        s.drop(1).dropRight(1)
-      else
-        s
+    def unquote(s:String) = if ( s.startsWith("\"") ) s.drop(1).dropRight(1) else s
 
     def generateIncludes() = {
       val rx = "-I\\s*(\\\"[^\\\"]+\\\"|[^\\\"\\s]+)".r
@@ -19,17 +17,25 @@ object QtProj {
       rx.findAllMatchIn(buildScript.cflags.mkString(" ")).foreach{
         x => wr.write((unquote(x.group(1))+"\n").replace("\\","/"))
       }
+      wr.write(expand(Compiler.incPath(buildScript.ccTool))+"\n")
       wr.close()
     }
 
     def generateFiles() = {
+      def rightSlash(s:String) = s.map{x => if (x != '\\') x else '/' }
       val wr = new FileWriter(new File(mainFile.getParent, mainFile.getName + ".files"), true)
       buildScript.sources.foreach{ x=> wr.write((x+"\n").replace("\\","/")) }
+      val cc = expand(Compiler.ccPath(buildScript.ccTool))
+      val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
+      val rx = ("("+rightSlash(buildDir.getPath) + "/\\S+.h)\\s*").r
+      val pl = ProcessLogger(s =>
+        rx.findFirstMatchIn(rightSlash(s)) match {
+          case Some(path) => wr.write(path+"\n")
+          case None =>
+        },
+        s => Unit)
+      cmdl!pl
       wr.close()
-    }
-
-    def generateUser() = {
-
     }
 
     def generateConfig() = {
@@ -56,6 +62,7 @@ object QtProj {
     generateConfig()
     generateIncludes()
     generateFiles()
-    generateUser()
+
+    // generating .creator.user file
   }
 }

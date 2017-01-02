@@ -16,6 +16,11 @@ object Compiler extends Enumeration {
     case ARMCC => "armcc"
   }
 
+  def incPath(kind:Value):String = kind match {
+    case ARMCC => "[armcc]\\include"
+    case GCC => "[gcc]\\include"
+  }
+
   def ccPath(kind:Value):String = kind match {
     case ARMCC => "[armcc]\\bin\\armcc.exe"
     case GCC => "[gcc]\\bin\\arm-none-eabi-gcc.exe"

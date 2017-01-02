@@ -6,12 +6,9 @@ import sys.process._
 import compiler.Compiler
 import debugger.Debugger
 import buildscript.BuildScript
+import buildscript.BuildConfig
 import qteproj.QtProj
 import pragmas._
-
-object BuildConfig extends Enumeration {
-  val Debug, Release = Value
-}
 
 object Target extends Enumeration {
   val Rebuild, Build, Erase, Flash, Connect, Reset, Qte = Value
@@ -181,8 +178,9 @@ object Prog {
     println(s"uccm is working now for board $targetBoard")
 
     val buildDir = new File(".",
-      if ( cmdlOpts.buildConfig == BuildConfig.Release ) s"~Release/$targetBoard"
-      else s"~Debug/$targetBoard"
+      //if ( cmdlOpts.buildConfig == BuildConfig.Release ) s"~Release/$targetBoard"
+      //else s"~Debug/$targetBoard"
+      s"~$targetBoard"
     )
 
     if ( !buildDir.exists ) buildDir.mkdirs()
@@ -282,7 +280,7 @@ object Prog {
             println(cmdl)
             cmdl.!
           }
-          expandAlias(s.replace(m.group(1),expand))
+          expandAlias(s.replace(m.group(1),f.getPath))
       }
     }
 
@@ -297,7 +295,7 @@ object Prog {
         case UccmBoard("*",value) => value :: xcflags
         case _ => xcflags
       }
-    }.map{expandHome}.reverse
+    }.map{expandAlias}.reverse
 
     val buildScriptFile = new File(buildDir,"script.xml")
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
@@ -315,7 +313,7 @@ object Prog {
       val gccPreprocCmdline = quote(cc) +
         " -E " +
         optSelector +
-        xcflags.map{expandHome}.mkString(" ") +
+        xcflags.mkString(" ") +
         " " + mainFilePath
 
       println(s"preprocessing main C-file ...")
@@ -323,7 +321,10 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
-      Pragmas.extractFrom(tempFile).foldLeft(BuildScript(targetCompiler,targetDebugger,List(s"-I${quote(uccmHome.getCanonicalPath)}"),List(mainFilePath))) {
+      Pragmas.extractFrom(tempFile).foldLeft(
+        BuildScript(targetCompiler,targetDebugger,cmdlOpts.buildConfig,
+          List(s"-I{UCCM}",optSelector),
+          List(mainFilePath))) {
         (bs,prag) => prag match {
           case UccmXcflags(x,value) => Compiler.fromString(x) match {
             case Some(`targetCompiler`) => bs.copy(cflags = value :: bs.cflags)
@@ -408,7 +409,7 @@ object Prog {
     }
 
     if ( cmdlOpts.targets.contains(Target.Qte) )
-      QtProj.generate(mainFile,buildScript)
+      QtProj.generate(mainFile,buildScript,buildDir,expandHome)
 
     else {
 

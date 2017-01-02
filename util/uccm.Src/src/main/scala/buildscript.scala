@@ -3,8 +3,24 @@ package com.sudachen.uccm.buildscript
 import com.sudachen.uccm.compiler.Compiler
 import com.sudachen.uccm.debugger.Debugger
 
+object BuildConfig extends Enumeration {
+  val Debug, Release = Value
+
+  def stringify(c:Value):String = c match {
+    case Debug => "debug"
+    case Release => "release"
+  }
+
+  def fromString(s:String):Option[Value] = s match {
+    case "debug" => Some(Debug)
+    case "release" => Some(Release)
+    case _ => None
+  }
+}
+
 case class BuildScript(ccTool:Compiler.Value,
                        dbgTool:Debugger.Value,
+                       config:BuildConfig.Value,
                        cflags:List[String] = Nil,
                        sources:List[String] = Nil,
                        modules:List[String] = Nil,
@@ -22,6 +38,9 @@ case class BuildScript(ccTool:Compiler.Value,
       <dbgtool>
         {Debugger.stringify(dbgTool)}
       </dbgtool>
+      <config>
+        {BuildConfig.stringify(config)}
+      </config>
       <cflags>
         {cflags map { i =>
         <flag>
@@ -80,6 +99,7 @@ object BuildScript {
     BuildScript(
       Compiler.fromString(ns((xml\"cctool" ).text)).get,
       Debugger.fromString(ns((xml\"dbgtool" ).text)).get,
+      BuildConfig.fromString(ns((xml\"config" ).text)).get,
       cflags = (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
       ldflags = (xml\"ldflags"\"flag").map{ x => ns(x.text)}.toList,
       asflags = (xml\"asflags"\"flag").map{ x => ns(x.text)}.toList,
