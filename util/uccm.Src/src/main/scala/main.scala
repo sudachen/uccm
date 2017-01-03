@@ -1,8 +1,8 @@
 package com.sudachen.uccm
-import java.io.{File,FileWriter}
+import java.io.{File, FileWriter}
 import org.apache.commons.io.FileUtils
+import scala.util.{Try,Success,Failure}
 import sys.process._
-
 import compiler.Compiler
 import debugger.Debugger
 import buildscript.BuildScript
@@ -475,6 +475,34 @@ object Prog {
             panic(s"failed to generate ${targetAsm.getPath}")
         }
       }
+
+      if ( cmdlOpts.targets.contains(Target.Erase) )
+        Debugger.erase(buildScript.dbgTool,verbose) match {
+          case Failure(f) =>
+            panic(f.getMessage)
+          case _ =>
+        }
+
+      if ( cmdlOpts.targets.contains(Target.Upload) )
+        Debugger.upload(buildScript.dbgTool,targetHex,verbose,
+          cmdlOpts.targets.contains(Target.Reset)) match {
+          case Failure(f) =>
+            panic(f.getMessage)
+          case _ =>
+        }
+      else if ( cmdlOpts.targets.contains(Target.Reset) )
+        Debugger.reset(buildScript.dbgTool,verbose) match {
+          case Failure(f) =>
+            panic(f.getMessage)
+          case _ =>
+        }
+
+      if ( cmdlOpts.targets.contains(Target.Connect) )
+        Debugger.connect(buildScript.dbgTool,verbose) match {
+          case Failure(f) =>
+            panic(f.getMessage)
+          case _ =>
+        }
 
     }
     println("succeeded")
