@@ -27,8 +27,8 @@
 
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
 
-#include "../leds.h"
-#include "../buttons.h"
+#include "../LED.h"
+#include "../button.h"
 
 __Inline
 void ucSetup_Board()
