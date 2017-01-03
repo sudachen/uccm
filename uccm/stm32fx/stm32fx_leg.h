@@ -113,13 +113,11 @@ void ucSetup_Analog(UcLeg leg)
     HAL_GPIO_Init(ucConst_GPIO_TABLE[leg.leg_no>>4],&pinDef);
 }
 
-static
 bool ucGet_Leg(UcLeg leg)
 {
     return ucConst_GPIO_TABLE[leg.leg_no>>4]->IDR & (1<<(leg.leg_no&0xf)) != 0;
 }
 
-static
 uint16_t ucGet_Legset(UcLeg leg, unsigned count)
 {
     uint16_t mask = (0xffff >> (16-count)) << (leg.leg_no&0xf);
@@ -141,7 +139,6 @@ void ucToggle_Leg(UcLeg leg)
     ucConst_GPIO_TABLE[leg.leg_no>>4]->ODR^=(1<<(leg.leg_no&0xf));
 }
 
-static
 void ucSet_Legset(UcLeg first_leg, unsigned count, uint16_t value)
 {
     uint16_t mask = (0xffff >> (16-count)) << (first_leg.leg_no&0xf);
