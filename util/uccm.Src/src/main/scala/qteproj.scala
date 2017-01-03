@@ -42,6 +42,7 @@ object QtProj {
     def generateFiles() = {
       val wr = new FileWriter(f_files, false)
       buildScript.sources.foreach{ x=> wr.write(local(x)+"\n") }
+      buildScript.modules.foreach{ x=> wr.write(local(x)+"\n") }
       val cc = expand(Compiler.ccPath(buildScript.ccTool))
       val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
       val where = local(buildDir.getPath)

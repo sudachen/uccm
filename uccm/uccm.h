@@ -48,7 +48,11 @@
 #define __Inline static inline
 #define __Forceinline static inline __attribute__((always_inline))
 
+#ifdef __keil_v5
+#define __Static_Assert_S(Expr,S) static int C_LOCAL_ID(static_assert)[(Expr)?1:-1] __attribute__((unused))
+#else
 #define __Static_Assert_S(Expr,S) _Static_assert(Expr,S)
+#endif
 #define __Static_Assert(Expr) __Static_Assert_S(Expr,#Expr)
 
 #define ucSet_Bits(Where, Bits)   ((Where) |= (Bits))

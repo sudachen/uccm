@@ -18,7 +18,10 @@ object Compiler extends Enumeration {
 
   def incPath(kind:Value):List[String] = kind match {
     case ARMCC => List("[armcc]\\include")
-    case GCC => List("[gcc]\\arm-none-eabi\\include","[gcc]\\lib\\gcc\\arm-none-eabi\\4.8.4\\include" )
+    case GCC => List("[gcc]\\arm-none-eabi\\include",
+      "[gcc]\\lib\\gcc\\arm-none-eabi\\4.8.4\\include",
+      "[gcc]\\lib\\gcc\\arm-none-eabi\\4.9.3\\include"
+    )
   }
 
   def ccPath(kind:Value):String = kind match {
@@ -29,6 +32,11 @@ object Compiler extends Enumeration {
   def asmPath(kind:Value):Option[String] = kind match {
     case ARMCC => Some("[armcc]\\bin\\armasm.exe")
     case GCC => None
+  }
+
+  def odmpPath(kind:Value):Option[String] = kind match {
+    case GCC => Some("[gcc]\\bin\\arm-none-eabi-objdump.exe")
+    case ARMCC => None
   }
 
   def ldPath(kind:Value):String = kind match {

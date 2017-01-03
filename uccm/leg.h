@@ -94,9 +94,12 @@ typedef struct { uint8_t leg_no; } UcLeg;
 #define PF1  UCCM_LEG('F',1)
 
 typedef enum {
+    // high leve is On
     LEG_FLOAT = 0,
-    LEG_PULL_UP,
     LEG_PULL_DOWN,
+    // high level is Off
+    LEG_PULL_UP,
+    LEG_INVFLOAT,
 } UcInputLegOpt;
 
 typedef enum {

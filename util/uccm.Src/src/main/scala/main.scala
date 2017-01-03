@@ -11,7 +11,7 @@ import qteproj.QtProj
 import pragmas._
 
 object Target extends Enumeration {
-  val Clean, Rebuild, Build, Erase, Flash, Connect, Reset, Qte = Value
+  val Clean, Rebuild, Build, Erase, Upload, Connect, Reset, Qte = Value
 }
 
 case class Component ( home: Option[String] = None,
@@ -50,37 +50,25 @@ object Prog {
         action( (_,c) => c.copy(verbose = true)).
         text("verbose output")
 
-      opt[Unit]("qte").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
-        text("generate QTcreator generic project")
+      opt[Unit]("build").
+        action( (_,c) => c.copy(targets = c.targets + Target.Build)).
+        text("build project (by default)")
+
+      opt[Unit]("no-build").
+        action( (_,c) => c.copy(targets = c.targets - Target.Build)).
+        text("skip project build action")
 
       opt[Unit]("clean").
         action( (_,c) => c.copy(targets = c.targets + Target.Clean - Target.Build)).
         text("remove intermediate files and target firmware")
 
-      opt[Unit]("build").
-        action( (_,c) => c.copy(targets = c.targets + Target.Build)).
-        text("build project, it's the action by default")
-
-      opt[Unit]("rebuild").
-        action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
-        text("reconfigure and do clean build")
-
-      opt[Unit]("release").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Release)).
-        text("build release")
-
-      opt[Unit]("debug").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Debug)).
-        text("build debug")
-
       opt[Unit]("erase").
         action( (_,c) => c.copy(targets = c.targets + Target.Erase)).
         text("erase uC memory")
 
-      opt[Unit]("flash").
-        action( (_,c) => c.copy(targets = c.targets + Target.Flash)).
-        text("write firmware into uC memory")
+      opt[Unit]("upload").
+        action( (_,c) => c.copy(targets = c.targets + Target.Upload)).
+        text("reprogram uC flash memory")
 
       opt[Unit]("reset").
         action( (_,c) => c.copy(targets = c.targets + Target.Reset)).
@@ -88,35 +76,51 @@ object Prog {
 
       opt[Unit]("connect").
         action( (_,c) => c.copy(targets = c.targets + Target.Connect)).
-        text("start debugger connected to uC")
+        text("try connect to uC")
 
       opt[String]('b',"board").
         action( (x,c) => c.copy(board = Some(x))).
-        text("set target board")
+        text("build for board")
+
+      opt[Unit]("qte").
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        text("generate QTcreator generic project")
+
+      opt[Unit]("rebuild").
+        action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
+        text("reconfigure and do clean build")
+
+      opt[Unit]("release").
+        action( (_,c) => c.copy(buildConfig = BuildConfig.Release)).
+        text("[on rebuild] configure for release build (by default)")
+
+      opt[Unit]("debug").
+        action( (_,c) => c.copy(buildConfig = BuildConfig.Debug)).
+        text("[on rebuild] configure for debug build")
 
       opt[String]('D',"define").
         action( (x,c) => c.copy(cflags = ("-D"+x)::c.cflags)).
-        text("add macor definition to compiler cflags")
+        text("[on rebuild] add macro definition to compiler cflags")
 
       opt[Unit]("gcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.GCC))).
-        text("use ARM-NONE-EABI GNU C compiler")
+        text("[on rebuild] use ARM-NONE-EABI GNU C compiler")
 
       opt[Unit]("armcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC))).
-        text("use KeilV5 armcc compiler")
+        text("[on rebuild] use KeilV5 armcc compiler")
 
       opt[Unit]("armcc-microlib").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC),cflags = "-DUSE_MICROLIB"::c.cflags)).
-        text("use KeilV5 armcc compiler with C-microlib")
+        text("[on rebuild] use KeilV5 armcc compiler with C-microlib")
 
       opt[Unit]("stlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.STLINK))).
-        text("use STM ST-Link debugger")
+        text("[on rebuild] use STM ST-Link debugger/programmer")
 
       opt[Unit]("jlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.JLINK))).
-        text("use SEGGER J-Link debugger")
+        text("[on rebuild] use SEGGER J-Link debugger/programmer")
 
       arg[File]("main.c").optional().
         action( (x,c) => c.copy(mainFile = Some(x))).
@@ -197,7 +201,7 @@ object Prog {
     val buildDir = new File(".",
       //if ( cmdlOpts.buildConfig == BuildConfig.Release ) s"~Release/$targetBoard"
       //else s"~Debug/$targetBoard"
-      s"~$targetBoard"
+      s"~$targetBoard-${mainFile.getName.take(mainFile.getName.lastIndexOf("."))}"
     )
 
     if ( !buildDir.exists ) buildDir.mkdirs()
@@ -206,6 +210,7 @@ object Prog {
     val targetElf = new File(buildDir,"firmware.elf")
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
+    val targetAsm = new File(buildDir,"firmware.asm")
 
     if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
       FileUtils.deleteDirectory(objDir)
@@ -390,7 +395,6 @@ object Prog {
     else
       println(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
 
-
     if ( cmdlOpts.targets.contains(Target.Rebuild) )
       buildScript.generated.foreach {
         case ( fname, content ) =>
@@ -464,6 +468,12 @@ object Prog {
         verbose(toBinCmdl)
         if (0 != toBinCmdl.!)
           panic(s"failed to generate ${targetBin.getName}")
+        if ( buildScript.ccTool == Compiler.GCC ) {
+          val cmdl = expandHome(Compiler.odmpPath(buildScript.ccTool).get) + " -d -S " + targetElf.getPath
+          verbose(cmdl)
+          if ( 0 != (cmdl #> targetAsm).! )
+            panic(s"failed to generate ${targetAsm.getPath}")
+        }
       }
 
     }
