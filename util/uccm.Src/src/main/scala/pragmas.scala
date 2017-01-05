@@ -38,16 +38,16 @@ object Pragmas {
 
     val rXcflags = "#pragma\\s*uccm\\s*xcflags\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rBoard   = "#pragma\\s*uccm\\s*board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rHome    = "#pragma\\s*uccm\\s*home\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rHome    = "#pragma\\s*uccm\\s*home\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rAlias   = "#pragma\\s*uccm\\s*alias\\(([A-Z_0-9]+)\\)\\s*=\\s*(.+)$".r
     val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
     val rLdflags = "#pragma\\s*uccm\\s*ldflags\\s*\\+?=\\s*(.+)$".r
     val rAsflags = "#pragma\\s*uccm\\s*asflags\\s*\\+?=\\s*(.+)$".r
-    val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*\\+?=\\s*(.+)$".r
     val rFile    = "#pragma\\s*uccm\\s*file\\(([\\.\\-\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rDefault = "#pragma\\s*uccm\\s*default\\((\\w+)\\)\\s*=\\s*(.+)$".r
-    val rInfo    = "#pragma\\s*uccm\\s*info\\((\\w+)\\)\\s*=\\s*(.+)$".r
-    val rDownload= "#pragma\\s*uccm\\s*download\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rInfo    = "#pragma\\s*uccm\\s*info\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rDownload= "#pragma\\s*uccm\\s*download\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
 
     def ns(s:String) = {
       val ss = s.dropRight(s.length-s.lastIndexWhere { _ !=  ' ' }-1)

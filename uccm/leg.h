@@ -3,7 +3,7 @@
 #include "uccm.h"
 
 typedef struct { uint8_t leg_no; } UcLeg;
-#define UCCM_LEG(Group,Leg) ((UcLeg){(Group-'A')<<4 | Leg})
+#define UCCM_LEG(Group,Leg) ((UcLeg){((Group-'A')<<4) | Leg})
 
 #define PA0  UCCM_LEG('A',0)
 #define PA1  UCCM_LEG('A',1)
@@ -39,6 +39,7 @@ typedef struct { uint8_t leg_no; } UcLeg;
 #define PB14 UCCM_LEG('B',14)
 #define PB15 UCCM_LEG('B',15)
 
+#ifdef UC_HAS_GPIO_PORT_C
 #define PC0  UCCM_LEG('C',0)
 #define PC1  UCCM_LEG('C',1)
 #define PC2  UCCM_LEG('C',2)
@@ -55,7 +56,9 @@ typedef struct { uint8_t leg_no; } UcLeg;
 #define PC13 UCCM_LEG('C',13)
 #define PC14 UCCM_LEG('C',14)
 #define PC15 UCCM_LEG('C',15)
+#endif
 
+#ifdef UC_HAS_GPIO_PORT_D
 #define PD0  UCCM_LEG('D',0)
 #define PD1  UCCM_LEG('D',1)
 #define PD2  UCCM_LEG('D',2)
@@ -72,7 +75,9 @@ typedef struct { uint8_t leg_no; } UcLeg;
 #define PD13 UCCM_LEG('D',13)
 #define PD14 UCCM_LEG('D',14)
 #define PD15 UCCM_LEG('D',15)
+#endif
 
+#ifdef UC_HAS_GPIO_PORT_E
 #define PE0  UCCM_LEG('E',0)
 #define PE1  UCCM_LEG('E',1)
 #define PE2  UCCM_LEG('E',2)
@@ -89,9 +94,12 @@ typedef struct { uint8_t leg_no; } UcLeg;
 #define PE13 UCCM_LEG('E',13)
 #define PE14 UCCM_LEG('E',14)
 #define PE15 UCCM_LEG('E',15)
+#endif
 
+#ifdef UC_HAS_GPIO_PORT_F
 #define PF0  UCCM_LEG('F',0)
 #define PF1  UCCM_LEG('F',1)
+#endif
 
 typedef enum {
     // high leve is On

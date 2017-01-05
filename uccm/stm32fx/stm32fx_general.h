@@ -4,6 +4,22 @@
 #include "../board.h" /* only for simantic code highlighting
                          really this file is included by board.h */
 
+#if defined GPIOC
+#define UC_HAS_PORT_C
+#endif
+
+#if defined GPIOD
+#define UC_HAS_PORT_D
+#endif
+
+#if defined GPIOE
+#define UC_HAS_PORT_E
+#endif
+
+#if defined GPIOF
+#define UC_HAS_PORT_F
+#endif
+
 void ucUser_ErrorHandler(void);
 void ucHandle_FatalError(void)
 {

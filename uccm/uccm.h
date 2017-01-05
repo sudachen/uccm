@@ -6,12 +6,15 @@
 
 #pragma uccm home(gcc)= %ARM_GCC_HOME%
 #pragma uccm info(gcc)= GNU C ARM NONE EABI compiling tool
-#pragma uccm download(gcc)= "https://launchpad.net/gcc-arm-embedded/4.8/4.8-2014-q3-update/+download/gcc-arm-none-eabi-4_8-2014q3-20140805-win32.zip"
+#pragma uccm download(gcc)= "https://github.com/alexeychen/uCcm/components.xml"
 
 #pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
 #pragma uccm info(cubefx_fw_f3)= CubeFx Framework for stm32f3 
-#pragma uccm download(cubefx_fw_f3)= "https://uccmpaks.keepmywork.com/cubefx_fw_f3.zip"
+#pragma uccm download(cubefx_fw_f3)= "https://github.com/alexeychen/uCcm/components.xml"
 
+#pragma uccm home(nrf5sdk12+)= %NRF5_SDK%
+#pragma uccm info(nrf5sdk12+)= Nordic nrf5x SoC SDK 12+
+#pragma uccm download(nrf5sdk12+)= "https://github.com/alexeychen/uCcm/components.xml"
 
 #ifdef __ARMCC_VERSION
 #define __keil_v5
@@ -54,6 +57,8 @@
 #define __Static_Assert_S(Expr,S) _Static_assert(Expr,S)
 #endif
 #define __Static_Assert(Expr) __Static_Assert_S(Expr,#Expr)
+
+#define __Assert(x) (void)0
 
 #define ucSet_Bits(Where, Bits)   ((Where) |= (Bits))
 #define ucClear_Bits(Where, Bits) ((Where) &= ~(Bits))

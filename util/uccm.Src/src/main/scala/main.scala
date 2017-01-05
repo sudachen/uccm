@@ -270,7 +270,7 @@ object Prog {
       }
     }
 
-    def expandHome(s:String):String = "(\\[([@\\w]+)\\])".r findFirstMatchIn s match {
+    def expandHome(s:String):String = "(\\[([@\\w\\+\\.]+)\\])".r findFirstMatchIn s match {
       case None => s
       case Some(m) => components.get(m.group(2)) match {
         case Some(Component(None, info, Some(url))) =>
@@ -300,6 +300,7 @@ object Prog {
         case Some(e) =>
           val f = new File(buildDir, m.group(2))
           val expand = expandHome(e)
+          verbose(s"$f => $expand")
           if (!f.exists && new File(expand).isDirectory) {
             val cmdl = "cmd /c mklink /J \"" + f.getAbsolutePath.replace("/", "\\") + "\" \"" + expand.replace("/", "\\") + "\""
             println(cmdl)
