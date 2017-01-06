@@ -1,6 +1,7 @@
 
 #pragma once
-#include "../uccm.h"
+#include <uccm/uccm.h>
+#include <uccm/./././nrf5sdk/nrf5_sdk_r12p2.h>
 
 #pragma uccm alias(NRF_DEVICE) = [nrf5sdk12+]/components/device
 #pragma uccm alias(NRF_LIBRARIES) = [nrf5sdk12+]/components/libraries
@@ -9,7 +10,12 @@
 #pragma uccm alias(SOFTDEVICE) = [nrf5sdk12+]/components/softdevice
 #pragma uccm alias(TOOLCHAIN) = [nrf5sdk12+]/components/toolchain
 
-#pragma uccm board(pca10028)= -D_BOARD_FILE=PCA10028.h -DNRF51422 -DBOARD_PCA10028 -DSOFTDEVICE_PRESENT -DNRF51 -DS130
+#pragma uccm default(vendorware)= BLE
+#pragma uccm default(debugger)= nrfjprog
+#pragma uccm debugger(nrfjprog)+= -f NRF51
+#pragma uccm vendorware(BLE)= {SOFTDEVICE}/130/hex/s130_nrf51_2.0.1_softdevice.hex
+#pragma uccm board(pca10028)= -D_BOARD_FILE=PCA10028.h -DNRF51422 -DBOARD_PCA10028 -DNRF51
+#pragma uccm xcflags(BLE)+= -DSOFTDEVICE_PRESENT -DS130
 #pragma uccm xcflags(gcc)+= -I "{TOOLCHAIN}/gcc"
 #pragma uccm xcflags(armcc)+= -I "{TOOLCHAIN}/arm"
 #pragma uccm xcflags(*)+= -I[@inc] \

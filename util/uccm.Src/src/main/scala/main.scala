@@ -11,7 +11,7 @@ import qteproj.QtProj
 import pragmas._
 
 object Target extends Enumeration {
-  val Clean, Rebuild, Build, Erase, Upload, Connect, Reset, Qte = Value
+  val Clean, Rebuild, Build, Reinit, Erase, Program, Connect, Reset, Qte = Value
 }
 
 case class Component ( home: Option[String] = None,
@@ -19,9 +19,9 @@ case class Component ( home: Option[String] = None,
                        download:Option[String] = None )
 
 case class MainDefaults(board:Option[String],
-                        compiler:Compiler.Value,
-                        debugger:Debugger.Value,
-                        msgs:List[String]) {
+                        compiler:Option[Compiler.Value] = None,
+                        debugger:Option[Debugger.Value] = None,
+                        msgs:List[String] = Nil) {
 
   def reverseMsgs:MainDefaults = copy(msgs = msgs.reverse)
 }
@@ -33,7 +33,8 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        debugger: Option[Debugger.Value] = None,
                        mainFile: Option[File] = None,
                        verbose:  Boolean = false,
-                       cflags:  List[String] = Nil
+                       cflags:  List[String] = Nil,
+                       vendorWare: String = "RAW"
                       )
 
 object Prog {
@@ -62,12 +63,16 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Clean - Target.Build)).
         text("remove intermediate files and target firmware")
 
+      opt[Unit]("reinit").
+        action( (_,c) => c.copy(targets = c.targets + Target.Reinit)).
+        text("erase all uC memory and reprogram vendor-ware if one defined")
+      
       opt[Unit]("erase").
         action( (_,c) => c.copy(targets = c.targets + Target.Erase)).
         text("erase uC memory")
 
-      opt[Unit]("upload").
-        action( (_,c) => c.copy(targets = c.targets + Target.Upload)).
+      opt[Unit]("program").
+        action( (_,c) => c.copy(targets = c.targets + Target.Program)).
         text("reprogram uC flash memory")
 
       opt[Unit]("reset").
@@ -122,6 +127,22 @@ object Prog {
         action( (_,c) => c.copy(debugger = Some(Debugger.JLINK))).
         text("[on rebuild] use SEGGER J-Link debugger/programmer")
 
+      opt[Unit]("nrfjprog").
+        action( (_,c) => c.copy(debugger = Some(Debugger.NRFJPROG))).
+        text("[on rebuild] use Nordic nrfjprog tool (requires J-Link)")
+
+      opt[Unit]("raw").
+        action( (_,c) => c.copy(vendorWare = "RAW")).
+        text("[on rebuild] use no vendor-ware")
+
+      opt[Unit]("ble").
+        action( (_,c) => c.copy(vendorWare = "BLE")).
+        text("[on rebuild] use BLE vendor-ware aka softdevice 130/132")
+
+      opt[String]("vendor-ware").
+        action( (x,c) => c.copy(vendorWare = x)).
+        text("[on rebuild] use specific vendor-ware")
+
       arg[File]("main.c").optional().
         action( (x,c) => c.copy(mainFile = Some(x))).
         text("firmware main.c file")
@@ -134,18 +155,6 @@ object Prog {
   }
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
-
-  def getUccmDirectory : Option[String]  = {
-    val rJar = "file:(\\S+.jar)".r
-    val rJarOne = "jar:file:(\\S+).jar!.+".r
-    val rClass = "file:(\\S+)/".r
-    classOf[BuildScript].getProtectionDomain.getCodeSource.getLocation.toURI.toURL.toString match {
-      case rJar(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rJarOne(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rClass(path) => Some(new File(path).getAbsolutePath)
-      case p => println(p); None
-    }
-  }
 
   def panic(text:String) : Unit = {
     System.err.println(text)
@@ -167,40 +176,30 @@ object Prog {
     if ( !mainFile.exists )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
 
-    val defaults = Pragmas.extractFrom(mainFile).foldLeft( MainDefaults(None,Compiler.GCC,Debugger.STLINK,Nil)) {
+    val mainPragmas = Pragmas.extractFrom(mainFile).toList
+    val targetBoard = cmdlOpts.board.getOrElse{ mainPragmas.foldLeft( Option[String](null) ) {
       ( dflts, prag ) => prag match {
         case UccmDefault(tag,value) => tag match {
-          case "board" => dflts.copy(board = Some(value))
-          case "compiler" => Compiler.fromString(value) match {
-            case Some(x) => dflts.copy(compiler = x)
-            case None => dflts.copy(msgs = s"unknown default compiler $value, pragma ignored" :: dflts.msgs)
-          }
-          case "debugger" => Debugger.fromString(value) match {
-            case Some(x) => dflts.copy(debugger = x)
-            case None => dflts.copy(msgs = s"unknown default debugger $value, pragma ignored" :: dflts.msgs)
-          }
-          case _ => dflts.copy(msgs = s"unknown default $tag, pragma ignored" :: dflts.msgs)
+          case "board" => Some(value)
         }
         case _ => dflts
-    }} .reverseMsgs
+    }} match {
+      case None =>
+        println("board is not specified");""
+      case Some(boardName) => boardName
+    }}
 
-    defaults.msgs.foreach { System.err.println }
+    val uccmHome = BuildScript.uccmDirectoryFile
 
-    val targetBoard: String = cmdlOpts.board.getOrElse(defaults.board.getOrElse("custom"))
-    val targetCompiler: Compiler.Value = cmdlOpts.compiler.getOrElse(defaults.compiler)
-    val targetDebugger: Debugger.Value = cmdlOpts.debugger.getOrElse(defaults.debugger)
-    val uccmHome = new File("c:/projects/rnd/uccm")
-
-    val boardPragmas : List[UccmPragma] = preprocessUccmBoardFiles(targetBoard,uccmHome)
-
-    if ( boardPragmas.isEmpty )
-      panic(s"unknown board $targetBoard")
+    val boardPragmas : List[UccmPragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) ++ mainPragmas match {
+      case Nil =>
+        panic(s"unknown board $targetBoard"); Nil
+      case lst => lst
+    }
 
     println(s"uccm is working now for board $targetBoard")
 
     val buildDir = new File(".",
-      //if ( cmdlOpts.buildConfig == BuildConfig.Release ) s"~Release/$targetBoard"
-      //else s"~Debug/$targetBoard"
       s"~$targetBoard-${mainFile.getName.take(mainFile.getName.lastIndexOf("."))}"
     )
 
@@ -310,11 +309,40 @@ object Prog {
       }
     }
 
+    val vendorWareMap = boardPragmas.foldLeft(Map[String, String]()) {
+      (vw, prag) =>
+        prag match {
+          case UccmVendorWare(tag, pathToHex) => vw + (tag -> pathToHex)
+          case _ => vw
+        }
+    }
+
+    val targetVendorWare = boardPragmas.foldLeft( Option[String](null) ) {
+      (df,prag) => prag match {
+        case UccmDefault("vendorware",tag) => Some(tag)
+        case _ => df
+      }
+    } match {
+      case None => cmdlOpts.vendorWare
+      case Some(wareName) => wareName
+    }
+
+    val targetCompiler: Compiler.Value = cmdlOpts.compiler match {
+      case Some(cc) => cc
+      case None => boardPragmas.foldLeft( Compiler.GCC ) {
+        (cc, prag) => prag match {
+          case UccmDefault("compiler",value) => Compiler.fromString(value).get
+          case _ => cc
+        }
+      }
+    }
+
     val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
       (xcflags,prag) => prag match {
+        case UccmXcflags(`targetVendorWare`,value) => value :: xcflags
+        case UccmXcflags("*",value) => value :: xcflags
         case UccmXcflags(x,value) => Compiler.fromString(x) match {
           case Some(`targetCompiler`) => value :: xcflags
-          case None if x == "*" => value :: xcflags
           case _ => xcflags
         }
         case UccmBoard(`targetBoard`,value) => value :: xcflags
@@ -348,13 +376,14 @@ object Prog {
         panic("failed to preprocess main C-file")
 
       Pragmas.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetCompiler,targetDebugger,cmdlOpts.buildConfig,
+        BuildScript(targetCompiler,None,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
+          case UccmXcflags(`targetVendorWare`,value) => bs.copy(cflags = value :: bs.cflags)
+          case UccmXcflags("*",value) => bs.copy(cflags = value :: bs.cflags)
           case UccmXcflags(x,value) => Compiler.fromString(x) match {
             case Some(`targetCompiler`) => bs.copy(cflags = value :: bs.cflags)
-            case None if x == "*" => bs.copy(cflags = value :: bs.cflags)
             case _ => bs
           }
           case UccmCflags(value) => bs.copy(cflags = value :: bs.cflags)
@@ -368,10 +397,13 @@ object Prog {
           case UccmRequire("begin",value) => bs.copy(begin = value :: bs.begin)
           case UccmRequire("end",value) => bs.copy(end = value :: bs.end)
           case UccmAppend(tag,value) => bs.copy(generated = (tag,value) :: bs.generated )
+          case UccmAppendEx(tag,value) => bs.copy(generated = (tag,expandAlias(value)) :: bs.generated )
+          case UccmDefault("debugger",value) => bs.copy( debugger = Debugger.fromString(value) )
           case _ => bs
         }
       } match {
         case bs => bs.copy(
+          vendorWare = targetVendorWare,
           generated = bs.generated.reverse,
           cflags = bs.cflags.map{expandAlias}.reverse,
           ldflags = bs.ldflags.map{expandAlias}.reverse,
@@ -380,7 +412,8 @@ object Prog {
                     bs.sources.map{expandAlias}.reverse ++
                     bs.end.map{expandAlias},
           modules = bs.modules.map{expandAlias}.reverse,
-          libraries = bs.libraries.map{expandAlias}.reverse
+          libraries = bs.libraries.map{expandAlias}.reverse,
+          debugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else bs.debugger
         )
       }
     }
@@ -393,8 +426,28 @@ object Prog {
 
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
       scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
-    else
+    else {
       println(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
+    }
+
+    println(s"uccm is using ${buildScript.vendorWare} vendor-ware")
+
+    val targetDebugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else buildScript.debugger
+    if ( targetDebugger.isDefined )
+      println(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
+    else
+      println(s"uccm is not using any debugger")
+
+    val dbgConnect:List[String] = targetDebugger match {
+      case Some(debugger) =>
+        val tag = Debugger.stringify(debugger)
+        boardPragmas.foldLeft( List[String]() ) {
+          (dbg, prag) => prag match {
+            case UccmDebugger(`tag`,opts) => opts :: dbg
+            case _ => dbg
+          }}
+      case None => Nil
+    }
 
     if ( cmdlOpts.targets.contains(Target.Rebuild) )
       buildScript.generated.foreach {
@@ -477,34 +530,49 @@ object Prog {
         }
       }
 
-      if ( cmdlOpts.targets.contains(Target.Erase) )
-        Debugger.erase(buildScript.dbgTool,verbose) match {
-          case Failure(f) =>
-            panic(f.getMessage)
-          case _ =>
-        }
+      if ( cmdlOpts.targets.intersect(Set(Target.Reinit,Target.Erase,Target.Program,Target.Reset,Target.Connect)).nonEmpty )
+        if ( targetDebugger.isEmpty )
+          panic("debuger is not defined")
+        else {
+          val targetsOrder = List(Target.Reinit, Target.Erase, Target.Program, Target.Reset, Target.Connect)
 
-      if ( cmdlOpts.targets.contains(Target.Upload) )
-        Debugger.upload(buildScript.dbgTool,targetHex,verbose,
-          cmdlOpts.targets.contains(Target.Reset)) match {
-          case Failure(f) =>
-            panic(f.getMessage)
-          case _ =>
-        }
-      else if ( cmdlOpts.targets.contains(Target.Reset) )
-        Debugger.reset(buildScript.dbgTool,verbose) match {
-          case Failure(f) =>
-            panic(f.getMessage)
-          case _ =>
-        }
+          val targets =
+            if (cmdlOpts.targets(Target.Program) && cmdlOpts.targets(Target.Reset))
+              cmdlOpts.targets - Target.Reset
+            else
+              cmdlOpts.targets
 
-      if ( cmdlOpts.targets.contains(Target.Connect) )
-        Debugger.connect(buildScript.dbgTool,verbose) match {
-          case Failure(f) =>
-            panic(f.getMessage)
-          case _ =>
-        }
+          lazy val vendorWareHex: Option[File] = buildScript.vendorWare match {
+            case "RAW" => None
+            case tag =>
+              if ( vendorWareMap.contains(tag) )
+                Some(new File(expandAlias(vendorWareMap(tag))))
+              else
+                panic("unknown vendor-ware $tag"); None
+          }
 
+          targetsOrder.filter {
+            targets(_)
+          }.foreach { t =>
+            (t match {
+              case Target.Erase =>
+                Debugger.erase(buildScript.debugger.get, verbose, dbgConnect)
+              case Target.Program =>
+                Debugger.program(buildScript.debugger.get, targetHex, verbose,
+                  cmdlOpts.targets.contains(Target.Reset), dbgConnect)
+              case Target.Reset =>
+                Debugger.reset(buildScript.debugger.get, verbose, dbgConnect)
+              case Target.Connect =>
+                Debugger.connect(buildScript.debugger.get, verbose, dbgConnect)
+              case Target.Reinit =>
+                Debugger.reinit(buildScript.debugger.get, verbose, dbgConnect, vendorWareHex)
+            }) match {
+              case Failure(f) =>
+                panic(f.getMessage)
+              case _ =>
+            }
+          }
+        }
     }
     println("succeeded")
   }
