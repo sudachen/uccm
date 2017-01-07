@@ -18,7 +18,8 @@ case class UccmAppendEx(tag:String, value:String) extends UccmPragma
 case class UccmDefault(tag:String, value:String) extends UccmPragma
 case class UccmInfo(tag:String, value:String) extends UccmPragma
 case class UccmDownload(tag:String, value:String) extends UccmPragma
-case class UccmVendorWare(tag:String, value:String) extends UccmPragma
+case class UccmSoftDevice(tag:String, value:String) extends UccmPragma
+case class UccmSoftDeviceAls(tag:String, value:String) extends UccmPragma
 case class UccmDebugger(tag:String, value:String) extends UccmPragma
 
 object Pragmas {
@@ -49,7 +50,8 @@ object Pragmas {
     val rXcflags = "#pragma\\s*uccm\\s*xcflags\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rDebugger= "#pragma\\s*uccm\\s*debugger\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
     val rBoard   = "#pragma\\s*uccm\\s*board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rVendorWare  = "#pragma\\s*uccm\\s*board\\(([\\+\\w]+)\\)\\s*=\\s*([\\.\\w]+)$".r
+    val rSoftDevice  = "#pragma\\s*uccm\\s*softdevice\\(([\\+\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rSoftDeviceAls  = "#pragma\\s*uccm\\s*softdevice\\(([\\+\\w]+)\\)\\s*=>\\s*(.+)$".r
     val rHome    = "#pragma\\s*uccm\\s*home\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rAlias   = "#pragma\\s*uccm\\s*alias\\(([A-Z_0-9]+)\\)\\s*=\\s*(.+)$".r
     val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
@@ -85,7 +87,8 @@ object Pragmas {
       case rDefault(tag,value) => Some(UccmDefault(tag,ns(value)))
       case rInfo(tag,value) => Some(UccmInfo(tag,ns(value)))
       case rDownload(tag,value) => Some(UccmDownload(tag,ns(value)))
-      case rVendorWare(tag,value) => Some(UccmVendorWare(tag,ns(value)))
+      case rSoftDeviceAls(tag,value) => Some(UccmSoftDeviceAls(tag,ns(value)))
+      case rSoftDevice(tag,value) => Some(UccmSoftDevice(tag,ns(value)))
       case rDebugger(tag,value) => Some(UccmDebugger(tag,ns(value)))
       case _ => None
     }

@@ -8,14 +8,6 @@
 #pragma uccm info(gcc)= GNU C ARM NONE EABI compiling tool
 #pragma uccm download(gcc)= "https://github.com/alexeychen/uCcm/components.xml"
 
-#pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
-#pragma uccm info(cubefx_fw_f3)= CubeFx Framework for stm32f3 
-#pragma uccm download(cubefx_fw_f3)= "https://github.com/alexeychen/uCcm/components.xml"
-
-#pragma uccm home(nrf5sdk12+)= %NRF5_SDK%
-#pragma uccm info(nrf5sdk12+)= Nordic nrf5x SoC SDK 12+
-#pragma uccm download(nrf5sdk12+)= "https://github.com/alexeychen/uCcm/components.xml"
-
 #ifdef __ARMCC_VERSION
 #define __keil_v5
 #endif

@@ -1,6 +1,6 @@
 
 #pragma once
-#include "../uccm.h"
+#include <uccm/uccm.h>
 
 #ifdef NRF51
 
@@ -19,6 +19,7 @@
 #else
 #pragma uccm require(begin)+= {TOOLCHAIN}/gcc/gcc_startup_nrf51.S
 #endif
+
 #pragma uccm require(begin)+= {TOOLCHAIN}/system_nrf51.c
 
 #include <nrf.h>

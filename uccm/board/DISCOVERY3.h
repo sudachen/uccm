@@ -1,14 +1,9 @@
 
 #pragma once
-#include "../uccm.h"
+#include <uccm/uccm.h>
+#include <uccm/./././stm32fx/stm32fx_f3_fw_r1p6.h>
 
-#pragma uccm alias(CMSIS) = [cubefx_fw_f3]/Drivers/CMSIS
-#pragma uccm alias(STM32F3XX) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx
-#pragma uccm alias(STM32HAL) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver
-
-#pragma uccm default(debugger)= stlink
 #pragma uccm board(discovery3)= -D_BOARD_FILE=DISCOVERY3.h -DSTM32F303xC
-#pragma uccm xcflags(*)+= -I[@inc] -I "{CMSIS}/Include" -I "{STM32F3XX}/Include" -I "{STM32HAL}/Inc"
 
 #ifndef STM32F303xC
 #error you have to define STM32F303xC
@@ -28,8 +23,8 @@
 
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
 
-#include "../LED.h"
-#include "../button.h"
+#include <uccm/LED.h>
+#include <uccm/button.h>
 
 __Inline
 void ucSetup_Board()

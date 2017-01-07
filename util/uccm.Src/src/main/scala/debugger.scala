@@ -32,7 +32,7 @@ object Debugger extends Enumeration {
   private[Debugger] lazy val nrfJprog = winExePath(findNrfjprog())
   private[Debugger] def findNrfjprog() : String = {
     var jprogPath:Option[String] = None
-    val rx = "InstallPath\\s+REG_SZ\\s+(\\.+)$".r
+    val rx = "^\\s*InstallPath\\s+REG_SZ\\s+(.+)$".r
 
     val pl = ProcessLogger(s => s match {
         case rx(installPath) =>
@@ -41,16 +41,19 @@ object Debugger extends Enumeration {
       },
       s => Unit)
 
-    val cmdl = """reg query "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Nordic Semiconductor\nrfjprog" /s /v InstallPath"""
-    println(cmdl)
+    val cmdl = """reg query "HKLM\SOFTWARE\WOW6432Node\Nordic Semiconductor\nrfjprog" /s /v InstallPath"""
     if ( 0 != (cmdl!pl))
       throw new RuntimeException("no nrfjprog found")
 
     jprogPath match {
-      case Some(s) => ns(s)
+      case Some(s) =>
+        val exeFile = ns(s)+"nrfjprog.exe"
+        if (new File(exeFile).exists)
+          return exeFile
       case None =>
-        throw new RuntimeException("no nrfjprog found")
     }
+
+    throw new RuntimeException("no nrfjprog found")
   }
 
   private[Debugger] lazy val stLinkCli = winExePath(findStLinkCli())
@@ -59,7 +62,6 @@ object Debugger extends Enumeration {
     sys.env.get("ST_LINK_HOME") match {
       case Some(s) =>
         val exeFile = new File(s+"\\ST-LINK Utility\\ST-LINK_CLI.exe")
-        println(exeFile)
         if ( exeFile.exists )
           return exeFile.getAbsolutePath
       case _ =>
@@ -72,7 +74,6 @@ object Debugger extends Enumeration {
       envGetOnOf(x) match {
         case s :: _ =>
           val exeFile = new File(s + "\\STMicroelectronics\\STM32 ST-LINK Utility\\ST-LINK Utility\\ST-LINK_CLI.exe")
-          println(exeFile)
           if (exeFile.exists)
             return exeFile.getAbsolutePath
         case _ =>
@@ -90,7 +91,7 @@ object Debugger extends Enumeration {
       if ( 0 != cmdl.! )
         throw new RuntimeException("failed to execute stlink command")
     case NRFJPROG =>
-      var rst = if (doReset) "-reset" else ""
+      var rst = if (doReset) "--reset" else ""
       val cmdl = (List(nrfJprog)++connopt++List("--program",firmwareHex.getPath,"--sectorerase",rst)).mkString(" ")
       verbose(cmdl)
       if ( 0 != cmdl.! )
@@ -142,7 +143,7 @@ object Debugger extends Enumeration {
         if ( vendorwareHex.isDefined )
           (List(nrfJprog)++connopt++List("--program",vendorwareHex.get.getPath,"--chiperase")).mkString(" ")
         else
-          (List(nrfJprog)++connopt++List("--chiperase")).mkString(" ")
+          (List(nrfJprog)++connopt++List("-e")).mkString(" ")
       verbose(cmdl)
       if ( 0 != cmdl.! )
         throw new RuntimeException("failed to execute jnrfprog command")

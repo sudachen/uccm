@@ -31,7 +31,7 @@ case class BuildScript(ccTool:Compiler.Value,
                        end:List[String] = Nil,
                        ldflags:List[String] = Nil,
                        asflags:List[String] = Nil,
-                       vendorWare:String = "RAW") {
+                       softDevice:String = "RAW") {
   def toXML : scala.xml.Node = {
     <uccm>
       <cctool>
@@ -40,9 +40,9 @@ case class BuildScript(ccTool:Compiler.Value,
       <debugger>
         {debugger match { case Some(tag) => Debugger.stringify(tag) case None => ""}}
       </debugger>
-      <vendorware>
-        {vendorWare}
-      </vendorware>
+      <softdevice>
+        {softDevice}
+      </softdevice>
       <config>
         {BuildConfig.stringify(config)}
       </config>
@@ -105,7 +105,7 @@ object BuildScript {
       Compiler.fromString(ns((xml\"cctool" ).text)).get,
       Debugger.fromString(ns((xml\"debugger" ).text)),
       BuildConfig.fromString(ns((xml\"config" ).text)).get,
-      vendorWare = ns((xml\"vendorware" ).text),
+      softDevice = ns((xml\"vendorware" ).text),
       cflags = (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
       ldflags = (xml\"ldflags"\"flag").map{ x => ns(x.text)}.toList,
       asflags = (xml\"asflags"\"flag").map{ x => ns(x.text)}.toList,
