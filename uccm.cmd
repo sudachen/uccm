@@ -1,4 +1,18 @@
 @echo off
+
+rem 
+rem  It's an uCcm starting script
+rem 
+rem  normally it needs to be redistributed with getuccm100.jar 
+rem    as part of the your project
+rem
+
+rem  Environment variable UCCM100REPO says 
+rem     where uccm should place all packages and itself also
+rem  Environment variable UCCM100DEV says
+rem     you are using development version taken from git repository
+rem     and where it is
+
 cd %~dp0
 
 if "%UCCM100REPO%"=="" set UCCM100REPO=%LOCALAPPDATA%\uCcm100Repo
