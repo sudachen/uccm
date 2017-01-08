@@ -18,14 +18,6 @@ case class Component ( home: Option[String] = None,
                        info: Option[String] = None,
                        download:Option[String] = None )
 
-case class MainDefaults(board:Option[String],
-                        compiler:Option[Compiler.Value] = None,
-                        debugger:Option[Debugger.Value] = None,
-                        msgs:List[String] = Nil) {
-
-  def reverseMsgs:MainDefaults = copy(msgs = msgs.reverse)
-}
-
 case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        targets:  Set[Target.Value] = Set(Target.Build),
                        board:    Option[String] = None,
@@ -41,6 +33,7 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
 object Prog {
 
   def main(argv: Array[String]): Unit = {
+
     val cmdlParser = new scopt.OptionParser[CmdlOptions]("uccm") {
       head("Alexey Sudachen' uC cortex-m build manager, goo.gl/a9irI7")
       help("help").
@@ -177,7 +170,6 @@ object Prog {
     def info(text:String) : Unit = {
       println(info_prefix+text+color_suffix)
     }
-
 
     val mainFile : File = cmdlOpts.mainFile match {
       case Some(f) => new File(f.getName)
