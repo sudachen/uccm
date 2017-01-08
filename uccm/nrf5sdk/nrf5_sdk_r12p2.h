@@ -20,6 +20,7 @@
     -I "{NRF_DEVICE}" \
     -I "{TOOLCHAIN}/cmsis/Include" \
     -I "{TOOLCHAIN}" \
+    -I "{NRF_LIBRARIES}/util" \
     -I "{NRF_DRIVERS}/hal" \
 
 #pragma uccm softdevice(S130)= {SOFTDEVICE}/s130/hex/s130_nrf51_2.0.1_softdevice.hex

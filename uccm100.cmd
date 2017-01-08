@@ -7,4 +7,4 @@ scala com.sudachen.uccm.Prog %*
 goto :eof
  
 :use_jar
-java -jar uccm100.jar %*
+java -jar %UCCMDIR%\uccm100.jar %*
