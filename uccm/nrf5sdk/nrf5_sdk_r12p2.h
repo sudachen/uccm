@@ -17,6 +17,7 @@
 #pragma uccm xcflags(gcc)+= -I "{TOOLCHAIN}/gcc"
 #pragma uccm xcflags(armcc)+= -I "{TOOLCHAIN}/arm"
 #pragma uccm xcflags(*)+= -I[@inc] \
+    -I "{UCCM}/uccm/nrf5sdk/cfg1" \
     -I "{NRF_DEVICE}" \
     -I "{TOOLCHAIN}/cmsis/Include" \
     -I "{TOOLCHAIN}" \
