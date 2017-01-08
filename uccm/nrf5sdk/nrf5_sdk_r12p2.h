@@ -46,8 +46,10 @@
 #pragma uccm cflags+= -D_INCLUDE_SDK_CONFIG_1
 
 #ifdef SOFTDEVICE_PRESENT
+
 #pragma uccm file(sdk_config_1.h) += \n\
 #ifndef BLE_ADVERTISING_ENABLED\n\
 #define BLE_ADVERTISING_ENABLED\n\
-#endif \n\
+#endif \n
+
 #endif
