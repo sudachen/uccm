@@ -1,7 +1,9 @@
 package com.sudachen.uccm
-import java.io.{File, FileWriter}
+import java.io.{File, FileWriter, PrintWriter}
+
 import org.apache.commons.io.FileUtils
-import scala.util.{Try,Success,Failure}
+
+import scala.util.{Failure, Success, Try}
 import sys.process._
 import compiler.Compiler
 import debugger.Debugger
@@ -27,7 +29,8 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        verbose:  Boolean = false,
                        color:  Boolean = false,
                        cflags:  List[String] = Nil,
-                       softDevice: Option[String] = None
+                       softDevice: Option[String] = None,
+                       newMain: Boolean = false
                       )
 
 object Prog {
@@ -48,6 +51,10 @@ object Prog {
       opt[Unit]('c',"color").
         action( (_,c) => c.copy(color = true)).
         text("colorize output")
+
+      opt[Unit]('n',"new-main").
+        action( (_,c) => c.copy(newMain = true)).
+        text("create new main.c file if no one exists")
 
       opt[Unit]("build").
         action( (_,c) => c.copy(targets = c.targets + Target.Build)).
@@ -181,10 +188,10 @@ object Prog {
     def verbose(s:String) =
       if (cmdlOpts.verbose) println(verbose_prefix + s + color_suffix )
 
-    if ( !mainFile.exists )
+    if ( !mainFile.exists && !cmdlOpts.newMain )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
 
-    val mainPragmas = Pragmas.extractFrom(mainFile).toList
+    val mainPragmas = if (mainFile.exists) Pragmas.extractFrom(mainFile).toList else Nil
     val targetBoard = cmdlOpts.board.getOrElse{ mainPragmas.foldLeft( Option[String](null) ) {
       ( dflts, prag ) => prag match {
         case UccmDefault(tag,value) => tag match {
@@ -372,6 +379,27 @@ object Prog {
     val buildScriptFile = new File(buildDir,"script.xml")
     if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
       info(s"uccm is using ${Compiler.stringify(targetCompiler)} compiler")
+
+    if ( !mainFile.exists ){
+      val wr = new PrintWriter(mainFile)
+      wr.println(s"#pragma uccm default(board)= $targetBoard")
+      if ( cmdlOpts.softDevice.isDefined)
+        wr.println(s"#pragma uccm default(softdevice)= ${cmdlOpts.softDevice.isDefined}")
+      if ( cmdlOpts.compiler.isDefined )
+        wr.println(s"#pragma uccm default(compiler)= ${Compiler.stringify(cmdlOpts.compiler.get)}")
+      if ( cmdlOpts.debugger.isDefined )
+        wr.println(s"#pragma uccm default(debugger)= ${Debugger.stringify(cmdlOpts.debugger.get)}")
+      wr.println("")
+      wr.println("#include <uccm/board.h>")
+      wr.println("")
+      wr.println("void main()")
+      wr.println("{")
+      wr.println("    ucSetup_Board();")
+      wr.println("    ucSetOn_BoardLed(0);")
+      wr.println("    for(;;) __NOP();")
+      wr.println("}")
+      wr.close()
+    }
 
     def extractFromPreprocessor : BuildScript = {
       val cc = expandHome(Compiler.ccPath(targetCompiler))
