@@ -40,11 +40,14 @@
     -I "{SOFTDEVICE10}/s110/headers" \
     -I "{SOFTDEVICE10}/common/softdevice_handler" \
 
-#pragma uccm file(sdk_config.h) += \n\
-#pragma once\n\
-#ifndef SDK_CONFIG_H\n\
-#define SDK_CONFIG_H\n\
+#pragma uccm file(sdk_config_1.h) += \n\
+#pragma once\n
+
+#pragma uccm cflags+= -D_INCLUDE_SDK_CONFIG_1
+
+#ifdef SOFTDEVICE_PRESENT
+#pragma uccm file(sdk_config_1.h) += \n\
 #ifndef BLE_ADVERTISING_ENABLED\n\
 #define BLE_ADVERTISING_ENABLED\n\
 #endif \n\
-#endif /*SDK_CONFIG_H*/\n
+#endif
