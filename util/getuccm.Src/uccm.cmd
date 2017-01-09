@@ -23,6 +23,7 @@ if not "%UCCM100DEV%"=="" (
 )
 
 if "%*"=="--uccm-update" (
+	if exist "%UCCM100REPO%\uccm-uccm100" rmdir /Q /S "%UCCM100REPO%\uccm-uccm100"
 	call :update_uccm
 	exit 0
 )

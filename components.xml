@@ -1,0 +1,60 @@
+<catalog>
+  <component>
+    <name>cubefx_fw_f3</name>
+    <althome>%CUBEFX_FW_F3%</althome>
+    <download></download>
+    <description>ST CubeFx Framework for Stm32F303 uC</description>
+    <type>archive</type>
+    <root></root>
+  </component>
+  <component>
+    <name>gcc</name>
+    <althome>%ARM_GCC_HOME%</althome>
+    <download>https://launchpad.net/gcc-arm-embedded/4.9/4.9-2015-q3-update/+download/gcc-arm-none-eabi-4_9-2015q3-20150921-win32.zip</download>
+    <description>ARM NONE EABI GCC 4.9</description>
+    <type>archive</type>
+    <root></root>
+  </component>
+  <component>
+    <name>nrf5sdk12</name>
+    <althome>%NRF5_SDK_12|NRF5_SDK%</althome>
+    <download>https://developer.nordicsemi.com/nRF5_SDK/nRF5_SDK_v12.x.x/nRF5_SDK_12.2.0_f012efa.zip</download>
+    <description>Nordic nRF5x SoC SDK 12.2</description>
+    <type>archive</type>
+    <root></root>
+  </component>
+  <component>
+    <name>nrf5sdk10</name>
+    <althome>%NRF5_SDK_10%</althome>
+    <download>https://developer.nordicsemi.com/nRF5_SDK/nRF51_SDK_v10.x.x/nRF51_SDK_10.0.0_dc26b5e.zip</download>
+    <description>Nordic nRF5x SoC SDK 10.0</description>
+    <type>archive</type>
+    <root></root>
+  </component>
+  <component>
+    <name>nrfjprog</name>
+    <althome></althome>
+    <download>https://www.nordicsemi.com/eng/nordic/download_resource/58850/37/94044999/nRF5x-Command-Line-Tools_9_2_1_Installer.exe</download>
+    <description>Nordic nRF5x SoC programming utility</description>
+    <type>setup</type>
+    <root></root>
+  </component>
+  <component>
+    <name>jlink</name>
+    <althome></althome>
+    <download>https://www.segger.com/downloads/jlink/JLink_Windows_V612e.exe</download>
+    <description>SEGGER J-Link debugging/programming utility</description>
+    <type>setup</type>
+    <root></root>
+  </component>
+  <component>
+    <name>qte</name>
+    <althome></althome>
+    <download>http://download.qt.io/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
+    <download>http://qt.mirror.constant.com/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
+    <download>http://linorg.usp.br/Qt/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
+    <description>QtCerator 4</description>
+    <type>setup</type>
+    <root></root>
+  </component>
+</catalog>

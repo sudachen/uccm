@@ -13,7 +13,7 @@ import qteproj.QtProj
 import pragmas._
 
 object Target extends Enumeration {
-  val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte = Value
+  val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
 }
 
 case class Component ( home: Option[String] = None,
@@ -93,7 +93,11 @@ object Prog {
         text("build for board")
 
       opt[Unit]("qte").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
+        text("generate QTcreator generic project")
+
+      opt[Unit]("open-qte").
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
         text("generate QTcreator generic project")
 
       opt[Unit]("rebuild").
@@ -225,12 +229,12 @@ object Prog {
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
-
-    if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
+    val prepareBuildDir = !buildDir.exists
+    if ( cmdlOpts.targets.contains(Target.Rebuild) && prepareBuildDir ) {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles{_.isFile}.foreach{_.delete}
-    } else if ( cmdlOpts.targets.contains(Target.Clean) && buildDir.exists ) {
+    } else if ( cmdlOpts.targets.contains(Target.Clean) && prepareBuildDir ) {
       FileUtils.deleteDirectory(objDir)
       buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
@@ -324,7 +328,7 @@ object Prog {
       }
     }
 
-    val vendorWareMap = boardPragmas.foldLeft(Map[String, String]()) {
+    val softDeviceMap = boardPragmas.foldLeft(Map[String, String]()) {
       (vw, prag) =>
         prag match {
           case UccmSoftDevice(tag, pathToHex) => vw + (tag -> pathToHex)
@@ -349,8 +353,8 @@ object Prog {
           }
         }
 
-    if ( targetSoftDevice != "RAW" && !vendorWareMap.contains(targetSoftDevice) )
-      panic(s"required to use unknown softdevice ${targetSoftDevice}")
+    if ( targetSoftDevice != "RAW" && !softDeviceMap.contains(targetSoftDevice) )
+      panic(s"required to use unknown softdevice $targetSoftDevice")
 
     val targetCompiler: Compiler.Value = cmdlOpts.compiler match {
       case Some(cc) => cc
@@ -395,7 +399,7 @@ object Prog {
       wr.println("void main()")
       wr.println("{")
       wr.println("    ucSetup_Board();")
-      wr.println("    ucSetOn_BoardLed(0);")
+      wr.println("    ucSetOn_BoardLED(0);")
       wr.println("    for(;;) __NOP();")
       wr.println("}")
       wr.close()
@@ -495,7 +499,7 @@ object Prog {
       case None => Nil
     }
 
-    if ( cmdlOpts.targets.contains(Target.Rebuild) )
+    if ( cmdlOpts.targets.contains(Target.Rebuild) || prepareBuildDir )
       buildScript.generated.foreach {
         case ( fname, content ) =>
           val text = content.replace("\\n","\n").replace("\\t","\t")
@@ -532,10 +536,14 @@ object Prog {
       objFile.getName :: ls
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte) )
+    if ( cmdlOpts.targets.contains(Target.Qte) && cmdlOpts.targets.contains(Target.QteStart)  )
       QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
 
-    else if ( cmdlOpts.targets.contains(Target.Build) ) {
+    if ( cmdlOpts.targets.contains(Target.QteStart) )
+      // start Qte
+      //QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
+
+    if ( cmdlOpts.targets.contains(Target.Build) ) {
 
       val objects = buildScript.sources.foldLeft(List[String]()) {
         compile
@@ -588,22 +596,22 @@ object Prog {
             else
               cmdlOpts.targets
 
-          lazy val vendorWareHex: Option[File] = buildScript.softDevice match {
+          lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
             case "RAW" => None
             case tag =>
-              if ( vendorWareMap.contains(tag) ) {
-                val fileName = expandAlias(vendorWareMap(tag))
-                info(s"using vendor ware '$fileName'")
+              if ( softDeviceMap.contains(tag) ) {
+                val fileName = expandAlias(softDeviceMap(tag))
+                info(s"using softdevice '$fileName'")
                 Some(new File(fileName))
               } else {
-                panic(s"unknown vendor-ware $tag")
+                panic(s"unknown softdevice $tag")
                 None
               }
           }
 
           targetsOrder.filter {
             targets(_)
-          }.foreach { t =>
+          } foreach { t =>
             (t match {
               case Target.Erase =>
                 Debugger.erase(buildScript.debugger.get, verbose, dbgConnect)
@@ -615,10 +623,7 @@ object Prog {
               case Target.Connect =>
                 Debugger.connect(buildScript.debugger.get, verbose, dbgConnect)
               case Target.Softdevice =>
-                if ( vendorWareHex.isDefined )
-                  Debugger.program(buildScript.debugger.get, vendorWareHex.get, verbose, false, dbgConnect)
-                else
-                  panic("there is no vendorware")
+                Debugger.programSoftDevice(buildScript.debugger.get, verbose, dbgConnect, softDeviceHex)
             }) match {
               case Failure(f) =>
                 panic(f.getMessage)
@@ -631,6 +636,7 @@ object Prog {
   }
 
   def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {
+
     val boardDir = new File(uccmHome,"uccm/board")
     val localBoardDir = new File(getCurrentDirectory,"board")
 
@@ -639,19 +645,19 @@ object Prog {
       case _ => Stream.empty
     }
 
-    val localBoardFiles : List[File] =
+    val localBoardFiles =
       if ( localBoardDir.exists && localBoardDir.isDirectory )
         localBoardDir.listFiles.toList
       else
         Nil
 
-    val boardPragmas: Option[List[UccmPragma]] = {
+    val boardPragmas = {
       if ( boardDir.exists && boardDir.isDirectory )
         f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
       else
         Stream.empty
     } find {
-        x => x.exists {
+        _.exists {
           case UccmBoard(`targetBoard`,_) => true
           case _ => false
         }

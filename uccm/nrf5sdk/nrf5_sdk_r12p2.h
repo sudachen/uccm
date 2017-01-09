@@ -1,14 +1,10 @@
 
-#pragma uccm home(nrf5sdk12)= %NRF5_SDK|NRF5_SDK_12%
-
 #pragma uccm alias(NRF_DEVICE) = [nrf5sdk12]/components/device
 #pragma uccm alias(NRF_LIBRARIES) = [nrf5sdk12]/components/libraries
 #pragma uccm alias(NRF_DRIVERS) = [nrf5sdk12]/components/drivers_nrf
 #pragma uccm alias(NRF_BLE) = [nrf5sdk12]/components/ble
 #pragma uccm alias(SOFTDEVICE) = [nrf5sdk12]/components/softdevice
 #pragma uccm alias(TOOLCHAIN) = [nrf5sdk12]/components/toolchain
-
-#pragma uccm home(nrf5sdk10)= %NRF5_SDK_10%
 #pragma uccm alias(SOFTDEVICE10) = [nrf5sdk10]/components/softdevice
 
 #pragma uccm default(softdevice)= BLE

@@ -1,6 +1,4 @@
 
-#pragma uccm home(cubefx_fw_f3)= %CUBEFX_FW_F3%
-
 #pragma uccm alias(CMSIS) = [cubefx_fw_f3]/Drivers/CMSIS
 #pragma uccm alias(STM32F3XX) = [cubefx_fw_f3]/Drivers/CMSIS/Device/ST/STM32F3xx
 #pragma uccm alias(STM32HAL) = [cubefx_fw_f3]/Drivers/STM32F3xx_HAL_Driver

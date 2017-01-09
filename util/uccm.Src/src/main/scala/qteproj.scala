@@ -11,7 +11,7 @@ object QtProj {
   def generate(mainFile:File, buildScript:BuildScript, buildDir:File,
                expand: String => String, verbose: String => Unit ) : Unit = {
 
-    def rightSlash(s:String) = s.map{x => if (x != '\\') x else '/' }
+    def rightSlash(s:String) = s.map{ case '\\' => '/' case x => x }
 
     def local(str:String) = rightSlash(str) match {
       case s => if (s.startsWith("./")) s.drop(2) else s

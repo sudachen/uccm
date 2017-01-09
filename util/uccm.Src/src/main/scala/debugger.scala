@@ -10,7 +10,7 @@ object Debugger extends Enumeration {
 
   private[Debugger] def ns(s:String):String = s.dropWhile{_.isSpaceChar}.reverse.dropWhile{_.isSpaceChar}.reverse
   private[Debugger] def quote(s:String):String = "\"" + s + "\""
-  private[Debugger] def winExePath(s:String):String = quote( s.map{ case '/' => '\\' case '\"' => '\0' case c => c }.filter{ _ != '\0' } )
+  private[Debugger] def winExePath(s:String):String = quote( s.map{ case '/' => '\\' case '\"' => '\u0000' case c => c }.filter{ '\u0000'.!= } )
 
   def fromString(name:String): Option[Value] = name match {
     case "stlink" => Some(STLINK)
@@ -137,15 +137,17 @@ object Debugger extends Enumeration {
         throw new RuntimeException("failed to execute jnrfprog command")
   })
 
-  def reinit(kind:Value,verbose:String=>Unit,connopt:List[String],vendorwareHex:Option[File]) : Try[Unit] = Try(kind match {
+  def programSoftDevice(kind:Value,verbose:String=>Unit,connopt:List[String],softDeviceHex:Option[File]) : Try[Unit] = Try(kind match {
     case NRFJPROG =>
       val cmdl =
-        if ( vendorwareHex.isDefined )
-          (List(nrfJprog)++connopt++List("--program",vendorwareHex.get.getPath,"--chiperase")).mkString(" ")
+        if ( softDeviceHex.isDefined )
+          (List(nrfJprog)++connopt++List("--program",softDeviceHex.get.getPath,"--chiperase")).mkString(" ")
         else
           (List(nrfJprog)++connopt++List("-e")).mkString(" ")
       verbose(cmdl)
       if ( 0 != cmdl.! )
         throw new RuntimeException("failed to execute jnrfprog command")
+    case _ =>
+      erase(kind,verbose,connopt)
   })
 }

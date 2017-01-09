@@ -7,7 +7,8 @@ lazy val root = (project in file(".")).
       version := "1.0.0",
       organization := "com.github.uccm",
       scalaVersion := "2.12.1",
-      licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
+      licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php")),
+      scalacOptions := Seq("-unchecked", "-deprecation", "-feature")
     )),
     name := "uccm",
     oneJarSettings,
