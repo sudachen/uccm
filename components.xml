@@ -6,6 +6,9 @@
     <description>ST CubeFx Framework for Stm32F303 uC</description>
     <type>archive</type>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>160</rev>
   </component>
   <component>
     <name>gcc</name>
@@ -14,6 +17,9 @@
     <description>ARM NONE EABI GCC 4.9</description>
     <type>archive</type>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>49X</rev>
   </component>
   <component>
     <name>nrf5sdk12</name>
@@ -22,6 +28,9 @@
     <description>Nordic nRF5x SoC SDK 12.2</description>
     <type>archive</type>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>c20</rev>
   </component>
   <component>
     <name>nrf5sdk10</name>
@@ -30,6 +39,9 @@
     <description>Nordic nRF5x SoC SDK 10.0</description>
     <type>archive</type>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>a00</rev>
   </component>
   <component>
     <name>nrfjprog</name>
@@ -37,7 +49,11 @@
     <download>https://www.nordicsemi.com/eng/nordic/download_resource/58850/37/94044999/nRF5x-Command-Line-Tools_9_2_1_Installer.exe</download>
     <description>Nordic nRF5x SoC programming utility</description>
     <type>setup</type>
+    <args>/install /passive</args>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>921</rev>
   </component>
   <component>
     <name>jlink</name>
@@ -46,15 +62,67 @@
     <description>SEGGER J-Link debugging/programming utility</description>
     <type>setup</type>
     <root></root>
+    <args></args>
+    <file></file>
+    <rev>612</rev>
   </component>
   <component>
     <name>qte</name>
     <althome></althome>
-    <download>http://download.qt.io/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <download>http://qt.mirror.constant.com/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <download>http://linorg.usp.br/Qt/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <description>QtCerator 4</description>
     <type>setup</type>
+    <rev>420</rev>
+    <args>--script &amp;file&amp;</args>
+    <file><![CDATA[
+function Controller() {
+    installer.autoRejectMessageBoxes();
+    installer.installationFinished.connect(function() {
+        gui.clickButton(buttons.NextButton);
+    })
+}
+
+Controller.prototype.WelcomePageCallback = function() {
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.CredentialsPageCallback = function() {
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.IntroductionPageCallback = function() {
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.TargetDirectoryPageCallback = function()
+{
+    gui.currentPageWidget().TargetDirectoryLineEdit.setText(installer.value("HomeDir") + "/Qt");
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.LicenseAgreementPageCallback = function() {
+    gui.currentPageWidget().AcceptLicenseRadioButton.setChecked(true);
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.StartMenuDirectoryPageCallback = function() {
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.ReadyForInstallationPageCallback = function()
+{
+    gui.clickButton(buttons.NextButton);
+}
+
+Controller.prototype.FinishedPageCallback = function() {
+var checkBoxForm = gui.currentPageWidget().LaunchQtCreatorCheckBoxForm
+    if (checkBoxForm && checkBoxForm.launchQtCreatorCheckBox) {
+        checkBoxForm.launchQtCreatorCheckBox.checked = false;
+    }
+    gui.clickButton(buttons.FinishButton);
+}]]>
+    </file>
     <root></root>
   </component>
 </catalog>

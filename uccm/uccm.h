@@ -1,13 +1,6 @@
 
 #pragma once
 
-#pragma uccm home(armcc)= %ARM_KCC_HOME%
-#pragma uccm info(armcc)= Keil v5 C/C++ compiling tool
-
-#pragma uccm home(gcc)= %ARM_GCC_HOME%
-#pragma uccm info(gcc)= GNU C ARM NONE EABI compiling tool
-#pragma uccm download(gcc)= "https://github.com/alexeychen/uCcm/components.xml"
-
 #ifdef __ARMCC_VERSION
 #define __keil_v5
 #endif
