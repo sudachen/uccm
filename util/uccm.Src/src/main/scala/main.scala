@@ -212,7 +212,7 @@ object Prog {
     info(s"uccm is working now for board $targetBoard")
 
     val buildDir = new File(".",
-      s"~$targetBoard-${mainFile.getName.take(mainFile.getName.lastIndexOf("."))}"
+      s"~$targetBoard"
     )
 
     if ( !buildDir.exists ) buildDir.mkdirs()
@@ -415,7 +415,7 @@ object Prog {
         panic("failed to preprocess main C-file")
 
       Pragmas.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetCompiler,None,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,targetCompiler,None,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
@@ -528,7 +528,7 @@ object Prog {
       objFile.getName :: ls
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte) && cmdlOpts.targets.contains(Target.QteStart)  )
+    if ( cmdlOpts.targets.contains(Target.Qte) || cmdlOpts.targets.contains(Target.QteStart)  )
       QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
 
     if ( cmdlOpts.targets.contains(Target.QteStart) )

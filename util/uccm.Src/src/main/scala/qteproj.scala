@@ -1,8 +1,11 @@
 package com.sudachen.uccm.qteproj
 
 import com.sudachen.uccm.compiler.Compiler
-import com.sudachen.uccm.buildscript.{BuildScript,BuildConfig}
+import com.sudachen.uccm.buildscript.{BuildConfig, BuildScript}
 import java.io.{File, FileWriter}
+
+import com.sudachen.uccm.debugger.Debugger
+
 import sys.process._
 import scala.xml.dtd.{DocType, PublicID}
 
@@ -17,7 +20,7 @@ object QtProj {
       case s => if (s.startsWith("./")) s.drop(2) else s
     }
 
-    val projPrefix = mainFile.getName.take(mainFile.getName.lastIndexOf("."))
+    val projPrefix = buildScript.boardName
     def unquote(s:String) = if ( s.startsWith("\"") ) s.drop(1).dropRight(1) else s
     val f_creator = new File(mainFile.getParent, projPrefix + ".creator")
     val f_creator_user = new File(mainFile.getParent, projPrefix + ".creator.user")
@@ -43,7 +46,7 @@ object QtProj {
       val wr = new FileWriter(f_files, false)
       buildScript.sources.foreach{ x=> wr.write(local(x)+"\n") }
       buildScript.modules.foreach{ x=> wr.write(local(x)+"\n") }
-      val cc = expand(Compiler.ccPath(buildScript.ccTool))
+      val cc = Compiler.ccPath(buildScript.ccTool)
       val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
       val where = local(buildDir.getPath)
       val rx = ("("+where+"/[/\\w\\.]+.h)").r
@@ -61,7 +64,7 @@ object QtProj {
 
     def generateConfig() = {
       val wr = new FileWriter(f_config, false)
-      val cc = expand(Compiler.ccPath(buildScript.ccTool))
+      val cc = Compiler.ccPath(buildScript.ccTool)
       val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(buildScript.ccTool)}.c")
       tempFile.createNewFile()
 
@@ -98,6 +101,12 @@ object QtProj {
     val workDir = mainFile.getAbsoluteFile.getParentFile.getCanonicalFile
     val uccmCmd = new File(workDir,"uccm.cmd")
 
+    val softDeviceOpt = if ( buildScript.softDevice.equals("RAW") ) "--raw" else "--softdevice "+buildScript.softDevice
+    val debuggerOpt = if ( buildScript.debugger.isEmpty ) "" else "--"+Debugger.stringify(buildScript.debugger.get)
+    val buildCfgOpt = "--"+BuildConfig.stringify(buildScript.config)
+    val compilerOpt = "--"+Compiler.stringify(buildScript.ccTool)
+    val uccmArgs = List(compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
+
     val qtUser =
         <qtcreator>
           <data>
@@ -123,7 +132,7 @@ object QtProj {
                 <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
                   <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
                     <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments"></value>
+                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs}</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
@@ -139,7 +148,7 @@ object QtProj {
                 <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.1">
                   <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
                     <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--rebuild --qte</value>
+                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --rebuild --qte</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
@@ -171,7 +180,7 @@ object QtProj {
                 <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
                   <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
                     <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">--flash --reset</value>
+                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --flash --reset</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
                     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Write firmware into uC Memory</value>
