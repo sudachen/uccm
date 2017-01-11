@@ -115,19 +115,30 @@ object BuildScript {
       generated = (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
     )}
 
-  lazy val uccmDirectory : Option[String]  = {
+  lazy val uccmDirectory : String  = {
     val rJar = "file:(\\S+.jar)".r
     val rJarOne = "jar:file:(\\S+).jar!.+".r
     val rClass = "file:(\\S+)/".r
     classOf[BuildScript].getProtectionDomain.getCodeSource.getLocation.toURI.toURL.toString match {
-      case rJar(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rJarOne(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rClass(path) => Some(new File(path).getAbsoluteFile.getParentFile.getParentFile.getParentFile.getParentFile.getParentFile.getPath)
-      case p => println(p); None
+      case rJar(path) => new File(path).getParentFile.getAbsolutePath
+      case rJarOne(path) => new File(path).getParentFile.getAbsolutePath
+      case rClass(path) => new File(path).getAbsoluteFile.getParentFile.getParentFile.getParentFile.getParentFile.getParentFile.getPath
+      case p =>
+        System.err.println("could not detect uCcm directory ")
+        System.exit(1); ""
     }
   }
 
-  def uccmDirectoryFile : File  = new File(uccmDirectory.get).getAbsoluteFile
+  lazy val uccmDirectoryFile : File  = new File(uccmDirectory).getAbsoluteFile
+
+  lazy val uccmRepoDirectory: String = {
+    sys.env.get("UCCM100REPO") match {
+      case Some(path) => path
+      case None => sys.env("LOCALAPPDATA") + "\\uCcm100Repo"
+    }
+  }
+
+  lazy val uccmRepoDirectoryFile: File = new File(uccmRepoDirectory).getAbsoluteFile
 
 }
 

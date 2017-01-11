@@ -4,8 +4,13 @@ import java.io.{File, FileOutputStream, FileWriter}
 import java.net.{HttpURLConnection, URL}
 import java.util.zip.ZipFile
 
+import com.sudachen.uccm.buildconsole.BuildConsole
+import com.sudachen.uccm.buildscript.BuildScript
+import org.apache.commons.io.FileUtils
+
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
+import sys.process._
 
 object PakType extends Enumeration {
   val Setup, Archive = Value
@@ -14,6 +19,12 @@ object PakType extends Enumeration {
     case "setup" => Setup
     case "archive" => Archive
   }
+
+  def stringify(kind:Value):String = kind match {
+    case Setup => "setup"
+    case Archive => "archive"
+  }
+
 }
 
 case class ComponentInfo( name:String,home:String,
@@ -25,6 +36,23 @@ case class ComponentInfo( name:String,home:String,
                           rev:String,
                           file:String,
                           isCurrentRev:Boolean)
+{
+  def toXML : xml.Node = {
+<component>
+  <name>{name}</name>
+  <root>{root.getOrElse("")}</root>
+  <description>{description}</description>
+  <type>{PakType.stringify(pakType)}</type>
+  <rev>{rev}</rev>
+  <args>{args}</args>
+  <file>{if (file.nonEmpty) scala.xml.PCData(file) else ""}</file>
+  <current>{if (isCurrentRev) "yes" else ""}</current>
+  {download.map { url:String =>
+  <download>{url}</download>
+  }}
+</component>
+  }
+}
 
 class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]) {
 
@@ -34,43 +62,41 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
   lazy val repoDownloadDir:File = new File(repoDir,".downloads")
 
   def download(url:String) : Try[File] = Try {
+
     val dst = new File(repoDownloadDir,new File(url).getName)
     val dstSha1 = new File(dst.getPath+".sha1")
     val dstPart = new File(dst.getPath+".part")
+
+    if (!repoDownloadDir.exists) repoDownloadDir.mkdirs()
+
     if ( !dst.exists || !dstSha1.exists ) {
+
       if ( dstPart.exists ) dstPart.delete()
-      System.out.print(s"connecting => $url")
+      if ( dstSha1.exists ) dstSha1.delete
+
+      val urlObj = new URL(url)
+      System.out.print(s"connecting to ${urlObj.getHost} ...")
       System.out.flush()
-      val con = new URL(url).openConnection().asInstanceOf[HttpURLConnection]
+      val con = urlObj.openConnection().asInstanceOf[HttpURLConnection]
       try {
         val is = con.getInputStream
         val length = con.getContentLength
-        val bf = Array.ofDim[Byte](1024 * 1024)
-
-        def read: Stream[Int] = is.read(bf, 0, bf.length) match {
-          case -1 => Stream.empty
-          case i => i #:: read
-        }
-
         val sha1 = java.security.MessageDigest.getInstance("SHA-1")
         val os = new FileOutputStream(dstPart)
+        val bf = Array.ofDim[Byte](1024 * 1024)
+
+        def cpy: Stream[Int] = is.read(bf) match {
+          case -1 => Stream.empty
+          case i => sha1.update(bf, 0, i); os.write(bf,0,i); i #:: cpy
+        }
+
         try {
-          System.out.print("\ndownloading ...")
+          System.out.print("\ndownloading ")
+          if ( length < 0 )
+            System.out.print("... ")
           System.out.flush()
-          val size = read.foldLeft(0) {
-            (q, x) => {
-              os.write(bf, 0, x)
-              if (length > 0) {
-                val step = Math.max(length / 50, 1)
-                val dif = (q + x) / step - q / step
-                if (dif > 0) {
-                  System.out.print("#" * dif)
-                  System.out.flush()
-                }
-              }
-              sha1.update(bf, 0, x)
-              q + x
-            }
+          val size = cpy.foldLeft(0) {
+            (q, x) => BuildConsole.barUpdate(q,x,length)
           }
           System.out.print(s" success! $size")
         } finally {
@@ -79,8 +105,8 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
         }
 
         dstPart.renameTo(dst)
-
         val sos = new FileWriter(dstSha1)
+
         try {
           sos.write(sha1.digest().map {
             "%02x".format(_)
@@ -97,9 +123,42 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
   }
 
   def setup(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
+    BuildConsole.info(s"installing ${cinfo.name}")
+
+    val args = if ( cinfo.args.contains("&file&")) {
+      val f = File.createTempFile("uccm-",".txt")
+      f.deleteOnExit()
+      val fw = new FileWriter(f)
+      fw.write(cinfo.file)
+      fw.close()
+      cinfo.args.replace("&file&",f.getAbsolutePath)
+    } else cinfo.args
+
+    val cmdl = "\""+file.getAbsolutePath+"\" " + args.mkString(" ")
+    BuildConsole.verbose(cmdl)
+    if ( 0 != cmdl.! )
+      throw new RuntimeException("failed to install")
   }
 
   def unpack(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
+    val fIsGood = mkIsGood(cinfo)
+    if (fIsGood.exists) fIsGood.delete()
+    val dir = mkPakDir(cinfo)
+    if (dir.exists) FileUtils.deleteDirectory(dir)
+
+    val z7a = BuildScript.uccmDirectory + "\\util\\7za.exe"
+    val cmdl = List(z7a,"x","-y","-O\""+dir.getAbsolutePath+"\"","\""+file.getAbsolutePath+"\"").mkString(" ")
+    val pl = ProcessLogger(s=>Unit,s=>Unit)
+    BuildConsole.info(s"unpaking ${cinfo.name}")
+    BuildConsole.verbose(cmdl)
+    if ( 0 != (cmdl!pl) )
+      throw new RuntimeException("7-zip was failed")
+    val fIsGoodTmp = new File(fIsGood.getPath+".tmp")
+    xml.XML.save(fIsGoodTmp.getPath,cinfo.toXML)
+    fIsGoodTmp.renameTo(fIsGood)
+  }
+
+  def unpackZip(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
     val dir = mkPakDir(cinfo)
     val zf = new ZipFile(file)
     try {
@@ -112,11 +171,11 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
           val os = new FileOutputStream(f)
           try {
             val bf = Array.ofDim[Byte](64 * 1024)
-            def read: Stream[Int] = is.read(bf) match {
+            def cpy: Stream[Int] = is.read(bf) match {
               case -1 => Stream.empty
-              case n => n #:: read
+              case n => os.write(bf,0,n); n #:: cpy
             }
-            read.foreach { n => os.write(bf, 0, n) }
+            cpy.foreach { x => Unit }
           } finally {
             os.close()
             is.close()
@@ -151,10 +210,16 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
       case None => queryRevision(name,rev) match {
         case None => false
         case Some(cinfo) =>
-          cinfo.download.map {
-            download
+          cinfo.download.map { url =>
+            download(url) match {
+              case Failure(e) =>
+                BuildConsole.stackTrace(e.getStackTrace)
+                BuildConsole.error(e.getMessage)
+                None
+              case Success(f) => Some(f)
+            }
           }.collectFirst {
-            case Success(file) =>
+            case Some(file) =>
               val ok = (cinfo.pakType match {
                 case PakType.Archive => unpack(file,cinfo)
                 case PakType.Setup => setup(file,cinfo)
@@ -228,5 +293,11 @@ object Components {
       }
     }
     new Components(repoDir,map)
+  }
+
+  lazy val dfltXmlFile = new File(BuildScript.uccmDirectoryFile,"components.xml")
+  lazy val dflt: Components = loadFrom(BuildScript.uccmRepoDirectoryFile,dfltXmlFile) match {
+    case Failure(e) => BuildConsole.panic(e.getMessage); null
+    case Success(c) => c
   }
 }

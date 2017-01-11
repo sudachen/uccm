@@ -23,7 +23,7 @@
   </component>
   <component>
     <name>nrf5sdk12</name>
-    <althome>%NRF5_SDK_12|NRF5_SDK%</althome>
+    <althome>%NRF5_SDK_12_|NRF5_SDK_%</althome>
     <download>https://developer.nordicsemi.com/nRF5_SDK/nRF5_SDK_v12.x.x/nRF5_SDK_12.2.0_f012efa.zip</download>
     <description>Nordic nRF5x SoC SDK 12.2</description>
     <type>archive</type>
@@ -74,7 +74,7 @@
     <description>QtCerator 4</description>
     <type>setup</type>
     <rev>420</rev>
-    <args>--script &amp;file&amp;</args>
+    <args>--script "&amp;file&amp;"</args>
     <file><![CDATA[
 function Controller() {
     installer.autoRejectMessageBoxes();
