@@ -346,6 +346,15 @@ object Prog {
       }
     }
 
+    if ( !Compiler.exists(targetCompiler) ) {
+      if (!cmdlOpts.yes)
+        panic(s"looks like required to download $targetCompiler, restart with -y")
+      else {
+        if (!Compiler.install(targetCompiler))
+          panic(s"failed to download $targetCompiler")
+      }
+    }
+
     val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
       (xcflags,prag) => prag match {
         case UccmXcflags(`targetSoftDevice`,value) => value :: xcflags
@@ -386,7 +395,7 @@ object Prog {
     }
 
     def extractFromPreprocessor : BuildScript = {
-      val cc = expandHome(Compiler.ccPath(targetCompiler))
+      val cc = Compiler.ccPath(targetCompiler)
       val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(targetCompiler)}.i")
       val mainFilePath = mainFile.getPath
       val optSelector = cmdlOpts.buildConfig match {
@@ -394,7 +403,7 @@ object Prog {
         case BuildConfig.Debug => " -D_DEBUG "
       }
 
-      val gccPreprocCmdline = quote(cc) +
+      val gccPreprocCmdline = cc +
         " -E " +
         optSelector +
         xcflags.mkString(" ") +
@@ -495,11 +504,8 @@ object Prog {
       }
 
     def compile(ls:List[String],source:String):List[String] = {
-      val cc = expandHome(Compiler.ccPath(buildScript.ccTool))
-      val asm:Option[String] = Compiler.asmPath(buildScript.ccTool) match {
-        case Some(x) => Some(expandHome(x))
-        case _ => None
-      }
+      val cc = Compiler.ccPath(buildScript.ccTool)
+      val asm = Compiler.asmPath(buildScript.ccTool)
       val srcFile = new File(source)
       val objFileName = srcFile.getName + ".obj"
       val objFile = new File(objDir,objFileName)
@@ -508,11 +514,11 @@ object Prog {
         info(s"compiling ${srcFile.getName} ...")
         val cmdline: String =
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
-            (List(quote(asm.get)) ++
-              buildScript.asflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
+            (asm.get ::
+              (buildScript.asflags ++
+              List(quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
           else
-            (List(quote(cc), "-c ") ++
+            (List(cc, "-c ") ++
               buildScript.cflags ++
               List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
         verbose(cmdline)
@@ -540,7 +546,7 @@ object Prog {
         compile
       }.reverse
 
-      val ld = expandHome(Compiler.ldPath(buildScript.ccTool))
+      val ld = Compiler.ldPath(buildScript.ccTool)
       val objFiles = (objects ++ modules).map { fn => new File(objDir, fn) }
 
       val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
@@ -550,21 +556,20 @@ object Prog {
       if (haveToRelink) {
         info("linking ...")
         List(targetBin, targetHex, targetElf).foreach { f => if (f.exists) f.delete }
-        val gccCmdline = (List(quote(ld)) ++ buildScript.ldflags ++ objFiles ++
-          List("-o", targetElf.getPath)).mkString(" ")
+        val gccCmdline = (ld :: (buildScript.ldflags ++ objFiles ++ List("-o", targetElf.getPath))).mkString(" ")
         verbose(gccCmdline)
         if (0 != gccCmdline.!)
           panic(s"failed to link ${targetElf.getName}")
-        val toHexCmdl = expandHome(Compiler.elfToHexCmdl(buildScript.ccTool, targetElf, targetHex))
+        val toHexCmdl = Compiler.elfToHexCmdl(buildScript.ccTool, targetElf, targetHex)
         verbose(toHexCmdl)
         if (0 != toHexCmdl.!)
           panic(s"failed to generate ${targetHex.getName}")
-        val toBinCmdl = expandHome(Compiler.elfToBinCmdl(buildScript.ccTool, targetElf, targetBin))
+        val toBinCmdl = Compiler.elfToBinCmdl(buildScript.ccTool, targetElf, targetBin)
         verbose(toBinCmdl)
         if (0 != toBinCmdl.!)
           panic(s"failed to generate ${targetBin.getName}")
         if ( buildScript.ccTool == Compiler.GCC ) {
-          val cmdl = expandHome(Compiler.odmpPath(buildScript.ccTool).get) + " -d -S " + targetElf.getPath
+          val cmdl = Compiler.odmpPath(buildScript.ccTool).get + " -d -S " + targetElf.getPath
           verbose(cmdl)
           if ( 0 != (cmdl #> targetAsm).! )
             panic(s"failed to generate ${targetAsm.getPath}")
