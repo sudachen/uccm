@@ -67,8 +67,8 @@
     <rev>612</rev>
   </component>
   <component>
-    <name>qte</name>
-    <althome></althome>
+    <name>qte420</name>
+    <althome>%UCCM100REPO%/uccm-qte420</althome>
     <download>http://qt.mirror.constant.com/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <download>http://linorg.usp.br/Qt/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <description>QtCerator 4</description>
@@ -97,7 +97,7 @@ Controller.prototype.IntroductionPageCallback = function() {
 
 Controller.prototype.TargetDirectoryPageCallback = function()
 {
-    gui.currentPageWidget().TargetDirectoryLineEdit.setText(installer.value("HomeDir") + "/Qt");
+    gui.currentPageWidget().TargetDirectoryLineEdit.setText("%UCCM100REPO%/uccm-qte420");
     gui.clickButton(buttons.NextButton);
 }
 

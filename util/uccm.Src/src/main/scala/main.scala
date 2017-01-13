@@ -95,13 +95,13 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
-      opt[Unit]("qte").
+      opt[Unit]("project").
         action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
-        text("generate QTcreator generic project")
+        text("update project files")
 
-      opt[Unit]("open-qte").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
-        text("generate QTcreator generic project")
+      opt[Unit]("edit").
+        action( (_,c) => c.copy(targets = c.targets + Target.QteStart)).
+        text("update project files and start code editor")
 
       opt[Unit]("rebuild").
         action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
@@ -278,7 +278,7 @@ object Prog {
             if (!Components.dflt.acquireComponent(comp))
               panic(s"failed to download $comp")
           } else {
-            panic(s"looks like required to download $comp, restart with -y")
+            panic(s"looks like it's required to download $comp, restart with -y")
           }
         val home = Components.dflt.getComponentHome(comp).get
         expandEnv(home) match {
@@ -334,7 +334,7 @@ object Prog {
         }
 
     if ( targetSoftDevice != "RAW" && !softDeviceMap.contains(targetSoftDevice) )
-      panic(s"required to use unknown softdevice $targetSoftDevice")
+      panic(s"could not use unknown softdevice $targetSoftDevice")
 
     val targetCompiler: Compiler.Value = cmdlOpts.compiler match {
       case Some(cc) => cc
@@ -348,11 +348,21 @@ object Prog {
 
     if ( !Compiler.exists(targetCompiler) ) {
       if (!cmdlOpts.yes)
-        panic(s"looks like required to download $targetCompiler, restart with -y")
+        panic(s"looks like it's required to download $targetCompiler, restart with -y")
       else {
         if (!Compiler.install(targetCompiler))
           panic(s"failed to download $targetCompiler")
       }
+    }
+
+    if ( cmdlOpts.targets.contains(Target.Qte) || cmdlOpts.targets.contains(Target.QteStart) ) {
+      if ( QtProj.isRequiredToInstall )
+        if (!cmdlOpts.yes)
+          panic(s"looks like it's required to install QtCreator, restart with -y")
+        else {
+          if (!QtProj.install())
+            panic("failed to install")
+        }
     }
 
     val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
@@ -528,13 +538,8 @@ object Prog {
       objFile.getName :: ls
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte) || cmdlOpts.targets.contains(Target.QteStart)  )
-      QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
-
-    if ( cmdlOpts.targets.contains(Target.QteStart) )
-      None
-      // start Qte
-      //QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
+    if ( cmdlOpts.targets.contains(Target.Qte)  )
+      QtProj.generate(mainFile,buildScript,buildDir,expandHome)
 
     if ( cmdlOpts.targets.contains(Target.Build) ) {
 
@@ -623,8 +628,22 @@ object Prog {
             }
           }
         }
+
+      info("succeeded")
+
+      if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
+        val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
+        val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
+        val cmd = QtProj.qteExe + " -settingspath " + settings + " " + project
+        verbose(cmd)
+        cmd.run()
+      } match {
+        case Success(_) => info("wait a little, code editor is starting ...")
+        case Failure(e) => BuildConsole.error(e.getMessage)
+      }
     }
-    info("succeeded")
+
+    System.exit(0)
   }
 
   def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {

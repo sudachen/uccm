@@ -1,6 +1,6 @@
 package com.sudachen.uccm.components
 
-import java.io.{File, FileOutputStream, FileWriter}
+import java.io.{File, FileOutputStream, FileWriter, PrintWriter}
 import java.net.{HttpURLConnection, URL}
 import java.util.zip.ZipFile
 
@@ -9,6 +9,7 @@ import com.sudachen.uccm.buildscript.BuildScript
 import org.apache.commons.io.FileUtils
 
 import scala.collection.JavaConverters._
+import scala.io.BufferedSource
 import scala.util.{Failure, Success, Try}
 import sys.process._
 
@@ -125,16 +126,28 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
   def setup(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
     BuildConsole.info(s"installing ${cinfo.name}")
 
+    val pat = "%UCCM100REPO%"
+
+    def expand(s:String) : Stream[String] = {
+      val t = BuildScript.uccmRepoDirectory.map{case '\\' => '/' case x => x}
+      s.indexOf(pat) match {
+        case n if n >= 0 =>
+          (s.substring(0,n) + t) #:: expand(s.substring(n+pat.length))
+        case _ => s #:: Stream.empty
+      }
+    }
+
+    val f = File.createTempFile("uccm-",".txt")
+
     val args = if ( cinfo.args.contains("&file&")) {
-      val f = File.createTempFile("uccm-",".txt")
       f.deleteOnExit()
       val fw = new FileWriter(f)
-      fw.write(cinfo.file)
+      expand(cinfo.file).foreach { x => fw.write(x) }
       fw.close()
       cinfo.args.replace("&file&",f.getAbsolutePath)
     } else cinfo.args
 
-    val cmdl = "\""+file.getAbsolutePath+"\" " + args.mkString(" ")
+    val cmdl = "\""+file.getAbsolutePath+"\" " + args
     BuildConsole.verbose(cmdl)
     if ( 0 != cmdl.! )
       throw new RuntimeException("failed to install")
@@ -158,35 +171,6 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
     fIsGoodTmp.renameTo(fIsGood)
   }
 
-  def unpackZip(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
-    val dir = mkPakDir(cinfo)
-    val zf = new ZipFile(file)
-    try {
-      zf.entries.asScala.foreach { r =>
-        val f = new File(dir, r.getName)
-        if (r.isDirectory)
-          f.mkdirs()
-        else {
-          val is = zf.getInputStream(r)
-          val os = new FileOutputStream(f)
-          try {
-            val bf = Array.ofDim[Byte](64 * 1024)
-            def cpy: Stream[Int] = is.read(bf) match {
-              case -1 => Stream.empty
-              case n => os.write(bf,0,n); n #:: cpy
-            }
-            cpy.foreach { x => Unit }
-          } finally {
-            os.close()
-            is.close()
-          }
-        }
-      }
-    } finally {
-      zf.close()
-    }
-  }
-
   def queryRevision(name:String,rev:Option[String]) : Option[ComponentInfo] = {
     if ( !catalog.contains(name) )
         None
@@ -197,7 +181,7 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
           if ( lst.length == 1 ) Some(lst.head)
           else lst.collectFirst { case x if x.isCurrentRev => x }
         case Some(r) =>
-          lst.collectFirst { case x if x.rev.equals(r) => x }
+          lst.collectFirst { case x if x.rev == r => x }
       }
     }
   }
@@ -299,5 +283,46 @@ object Components {
   lazy val dflt: Components = loadFrom(BuildScript.uccmRepoDirectoryFile,dfltXmlFile) match {
     case Failure(e) => BuildConsole.panic(e.getMessage); null
     case Success(c) => c
+  }
+
+  def unpackZip(file:File, dir:File, preproc: String => Option[String => String] = _ => None ) : Try[Unit] = Try {
+    val zf = new ZipFile(file)
+    try {
+      zf.entries.asScala.foreach { r =>
+        val f = new File(dir, r.getName)
+        if (r.isDirectory)
+          f.mkdirs()
+        else {
+          val is = zf.getInputStream(r)
+          val os = new FileOutputStream(f)
+          try {
+            preproc(r.getName) match {
+
+              case Some(p) =>
+
+                val bs = new BufferedSource(is)
+                val pw = new PrintWriter(os)
+                bs.getLines().foreach { s => pw.println(p(s)) }
+
+              case None =>
+
+                val bf = Array.ofDim[Byte](64 * 1024)
+
+                def cpy(): Unit = is.read(bf) match {
+                  case n if 0 <= n => os.write(bf, 0, n); cpy()
+                  case _ =>
+                }
+
+                cpy()
+            }
+          } finally {
+            os.close()
+            is.close()
+          }
+        }
+      }
+    } finally {
+      zf.close()
+    }
   }
 }

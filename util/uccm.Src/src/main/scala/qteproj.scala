@@ -4,15 +4,177 @@ import com.sudachen.uccm.compiler.Compiler
 import com.sudachen.uccm.buildscript.{BuildConfig, BuildScript}
 import java.io.{File, FileWriter}
 
+import com.sudachen.uccm.buildconsole.BuildConsole
+import com.sudachen.uccm.components.Components
 import com.sudachen.uccm.debugger.Debugger
+import org.apache.commons.io.FileUtils
 
+import scala.util.{Failure, Success, Try}
 import sys.process._
 import scala.xml.dtd.{DocType, PublicID}
 
 object QtProj {
 
+  def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
+  def ns(s:String):String = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
+  def quote(s: String): String = "\"" + s + "\""
+  def winExePath(s: String): String = quote {
+    s.map {
+      case '/' => '\\'
+      case '\"' => '\u0000'
+      case c => c
+    }.filter {
+      '\u0000'.!=
+    }
+  }
+
+  def findQteInSystem: Try[Option[String]] = Try {
+    val rx = "^\\s*\\(Default\\)\\s+REG_SZ\\s+\"([^\"]+)\".*$".r
+    val where = List(
+      "HKLM\\SOFTWARE\\Classes\\creator_auto_file\\shell\\open\\command",
+      "HKCR\\creator_auto_file\\shell\\open\\command")
+
+    where.map { x =>
+      var path: Option[String] = None
+      val cmdl = "reg query " + x + " /ve"
+      cmdl ! ProcessLogger(s => s match {
+        case rx(p) => path = Some(p)
+        case _ =>
+      }, s => Unit)
+      path
+    }.collectFirst { case Some(x) => x } match {
+      case Some(path) =>
+        val exeFile = path
+        if (new File(exeFile).exists)
+          Some(exeFile)
+        else
+          None
+      case None => None
+    }
+  }
+
+  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"uccm-qte420")
+  lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte420-log.xml")
+  lazy val qteSettingsFile = new File(BuildScript.uccmRepoDirectoryFile,".qte")
+
+  case class InstallStatus(editorIsOk:Boolean = false,settingsIsOk:Boolean = false,isReady:Boolean = false) {
+    def toXML: xml.Node = {
+      <install>
+        <editor>{if(editorIsOk) 1 else 0}</editor>
+        <settings>{if(settingsIsOk) 1 else 0}</settings>
+        <ready>{if(isReady) 1 else 0}</ready>
+      </install>
+    }
+  }
+
+  object InstallStatus {
+    def fromXML(x: xml.Node): InstallStatus  = {
+      InstallStatus(
+        ns((x \ "editor").text).toInt != 0,
+        ns((x \ "settings").text).toInt != 0,
+        ns((x \ "ready").text).toInt != 0
+      )
+    }
+  }
+
+  def findQte: Try[Option[String]] = Try {
+    val qteProgFile = new File(qteInstallDir,"bin\\qtcreator.exe")
+    if ( !qteInstallDir.exists || !qteProgFile.exists || !qteInstalLogFile.exists )
+      None
+    else
+    {
+      val st = InstallStatus.fromXML(xml.XML.loadFile(qteInstalLogFile))
+      if ( st.isReady )
+        Some(qteProgFile.getAbsolutePath)
+      else
+        None
+    }
+  }
+
+  def getQteProg: Option[String] = {
+    findQte match {
+      case Success(opt) => opt match {
+        case Some(s) => Some(winExePath(s))
+        case None => None
+      }
+      case Failure(e) =>
+        BuildConsole.stackTrace(e.getStackTrace)
+        BuildConsole.panic(s"error occured ${e.getMessage}")
+        None
+    }
+  }
+
+  lazy val qteExe : String = getQteProg match {
+    case Some(prog) => prog
+    case None =>
+      BuildConsole.panic("QtCreator software is not installed"); ""
+  }
+
+  def isRequiredToInstall : Boolean = {
+    getQteProg.isEmpty || (Try {
+      val st = InstallStatus.fromXML(xml.XML.loadFile(qteInstalLogFile))
+      !st.isReady
+    } match {
+      case Success(b) => b
+      case Failure(_) => false
+    })
+  }
+
+  def install(): Boolean = Try {
+
+    val st =  if ( qteInstalLogFile.exists )
+                InstallStatus.fromXML(xml.XML.loadFile(qteInstalLogFile))
+              else
+                InstallStatus()
+
+    def write(nst:InstallStatus) = xml.XML.save(qteInstalLogFile.getAbsolutePath,nst.toXML)
+
+    (if ( !st.editorIsOk ) {
+      if ( qteInstallDir.exists ) FileUtils.deleteDirectory(qteInstallDir)
+      if (Components.dflt.acquireComponent("qte420")) {
+        val nst = st.copy(editorIsOk = true); write(nst); Some(nst)
+      }
+      else None
+    } else Some(st)) match {
+      case None => false
+      case Some(nst) =>
+        val rx = ".*\\[\\/](\\w+).xml$".r
+        val patRepo = "%UCCM100REPO%"
+        val arcFile = new File(BuildScript.uccmDirectoryFile,"util/qte420-settings.zip")
+
+        def expand(s:String):String = s.indexOf(patRepo) match {
+          case n if n >= 0 =>
+            val tail = s.substring(n+patRepo.length)
+            s.substring(0,n) + BuildScript.uccmRepoDirectory + expand(tail)
+          case _ => s
+        }
+
+        def p(n:String) : Option[String => String] = n match {
+          case rx(s) =>
+            Some( t => expand(t) )
+          case _ => None
+        }
+
+        Components.unpackZip(arcFile,qteSettingsFile,p) match {
+          case Success(_) =>
+            write(nst.copy(settingsIsOk = true,isReady = true))
+            true
+          case Failure(e) =>
+            BuildConsole.stackTrace(e.getStackTrace)
+            BuildConsole.error(e.getMessage)
+            false
+        }
+    }
+  } match {
+    case Success(b) => b
+    case Failure(e) =>
+      BuildConsole.stackTrace(e.getStackTrace)
+      BuildConsole.error(e.getMessage)
+      false
+  }
+
   def generate(mainFile:File, buildScript:BuildScript, buildDir:File,
-               expand: String => String, verbose: String => Unit ) : Unit = {
+               expand: String => String) : Unit = {
 
     def rightSlash(s:String) = s.map{ case '\\' => '/' case x => x }
 
@@ -57,7 +219,7 @@ object QtProj {
           case _ =>
         }},
         s => Unit)
-      verbose(cmdl)
+      BuildConsole.verbose(cmdl)
       cmdl!pl
       wr.close()
     }
@@ -82,7 +244,7 @@ object QtProj {
         },
         s => Unit)
 
-      verbose(cmdl)
+      BuildConsole.verbose(cmdl)
       cmdl!pl
       tempFile.delete
       wr.close()
@@ -101,7 +263,7 @@ object QtProj {
     val workDir = mainFile.getAbsoluteFile.getParentFile.getCanonicalFile
     val uccmCmd = new File(workDir,"uccm.cmd")
 
-    val softDeviceOpt = if ( buildScript.softDevice.equals("RAW") ) "--raw" else "--softdevice "+buildScript.softDevice
+    val softDeviceOpt = if ( buildScript.softDevice == "RAW" ) "--raw" else "--softdevice "+buildScript.softDevice
     val debuggerOpt = if ( buildScript.debugger.isEmpty ) "" else "--"+Debugger.stringify(buildScript.debugger.get)
     val buildCfgOpt = "--"+BuildConfig.stringify(buildScript.config)
     val compilerOpt = "--"+Compiler.stringify(buildScript.ccTool)

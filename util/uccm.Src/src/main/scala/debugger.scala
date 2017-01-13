@@ -51,24 +51,22 @@ object Debugger extends Enumeration {
     }
 
   private[Debugger] def findNrfjprog: Try[Option[String]] = Try {
-    var jprogPath: Option[String] = None
     val rx = "^\\s*InstallPath\\s+REG_SZ\\s+(.+)$".r
+    val where = List(
+      "HKLM\\SOFTWARE\\WOW6432Node\\Nordic Semiconductor\\nrfjprog",
+      "HKLM\\SOFTWARE\\Nordic Semiconductor\\nrfjprog")
 
-    val pl = ProcessLogger(s =>
-      s match {
-        case rx(installPath) =>
-          jprogPath = Some(installPath)
+    where.map { x =>
+      var path: Option[String] = None
+      val cmdl = "reg query \"" + x + "\" /s /v InstallPath"
+      cmdl ! ProcessLogger(s => s match {
+        case rx(p) => path = Some(p)
         case _ =>
-      },
-      s => Unit)
-
-    val cmdl = """reg query "HKLM\SOFTWARE\WOW6432Node\Nordic Semiconductor\nrfjprog" /s /v InstallPath"""
-    if (0 != (cmdl ! pl))
-      throw new RuntimeException("reg query system command was failed")
-
-    jprogPath match {
-      case Some(s) =>
-        val exeFile = ns(s) + "nrfjprog.exe"
+      }, s => Unit)
+      path
+    }.collectFirst { case Some(x) => x } match {
+      case Some(path) =>
+        val exeFile = ns(path) + "nrfjprog.exe"
         if (new File(exeFile).exists)
           Some(exeFile)
         else
