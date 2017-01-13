@@ -147,7 +147,7 @@ object Debugger extends Enumeration {
       val cmdl = (List(nrfJprog) ++ connopt ++ List("--program", firmwareHex.getPath, "--sectorerase", rst)).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute jnrfprog command")
+        throw new RuntimeException("failed to execute nrfjprog command")
   })
 
   def reset(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -160,7 +160,7 @@ object Debugger extends Enumeration {
       val cmdl = (List(nrfJprog) ++ connopt ++ List("--reset")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute jnrfprog command")
+        throw new RuntimeException("failed to execute nrfjprog command")
   })
 
   def connect(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -173,7 +173,7 @@ object Debugger extends Enumeration {
       val cmdl = (List(nrfJprog) ++ connopt ++ List("--readregs")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute jnrfprog command")
+        throw new RuntimeException("failed to execute nrfjprog command")
   })
 
   def erase(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -186,7 +186,7 @@ object Debugger extends Enumeration {
       val cmdl = (List(nrfJprog) ++ connopt ++ List("-e")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute jnrfprog command")
+        throw new RuntimeException("failed to execute nrfjprog command")
   })
 
   def programSoftDevice(kind: Value, connopt: List[String], softDeviceHex: Option[File]): Try[Unit] = Try(kind match {
@@ -198,7 +198,7 @@ object Debugger extends Enumeration {
           (List(nrfJprog) ++ connopt ++ List("-e")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute jnrfprog command")
+        throw new RuntimeException("failed to execute nrfjprog command")
     case _ =>
       erase(kind, connopt)
   })

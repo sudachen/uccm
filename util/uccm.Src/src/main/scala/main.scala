@@ -96,7 +96,7 @@ object Prog {
         text("build for board")
 
       opt[Unit]("edit").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
         text("update project and start code editor")
 
       opt[Unit]("rebuild").
@@ -211,6 +211,7 @@ object Prog {
       s"~$targetBoard"
     )
 
+    val prepareBuildDir = !buildDir.exists
     if ( !buildDir.exists ) buildDir.mkdirs()
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
@@ -218,12 +219,11 @@ object Prog {
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
-    val prepareBuildDir = !buildDir.exists
-    if ( cmdlOpts.targets.contains(Target.Rebuild) && !prepareBuildDir ) {
+    if ( cmdlOpts.targets.contains(Target.Rebuild) ) {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles{_.isFile}.foreach{_.delete}
-    } else if ( cmdlOpts.targets.contains(Target.Clean) && !prepareBuildDir ) {
+    } else if ( cmdlOpts.targets.contains(Target.Clean) ) {
       FileUtils.deleteDirectory(objDir)
       buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
@@ -569,16 +569,16 @@ object Prog {
         verbose(toBinCmdl)
         if (0 != toBinCmdl.!)
           panic(s"failed to generate ${targetBin.getName}")
-        if ( buildScript.ccTool == Compiler.GCC ) {
+        if (buildScript.ccTool == Compiler.GCC) {
           val cmdl = Compiler.odmpPath(buildScript.ccTool).get + " -d -S " + targetElf.getPath
           verbose(cmdl)
-          if ( 0 != (cmdl #> targetAsm).! )
+          if (0 != (cmdl #> targetAsm).!)
             panic(s"failed to generate ${targetAsm.getPath}")
         }
       }
 
-      if ( cmdlOpts.targets.intersect(Set(Target.Softdevice,Target.Erase,Target.Program,Target.Reset,Target.Connect)).nonEmpty )
-        if ( targetDebugger.isEmpty )
+      if (cmdlOpts.targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
+        if (targetDebugger.isEmpty)
           panic("debuger is not defined")
         else {
           val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
@@ -592,7 +592,7 @@ object Prog {
           lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
             case "RAW" => None
             case tag =>
-              if ( softDeviceMap.contains(tag) ) {
+              if (softDeviceMap.contains(tag)) {
                 val fileName = expandAlias(softDeviceMap(tag))
                 info(s"using softdevice '$fileName'")
                 Some(new File(fileName))
@@ -624,20 +624,20 @@ object Prog {
             }
           }
         }
+    }
 
-      info("succeeded")
+    info("succeeded")
 
-      if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
-        val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
-        val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
-        val mainC = quote(mainFile.getPath)
-        val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
-        verbose(cmd)
-        cmd.run()
-      } match {
-        case Success(_) => info("wait a little, code editor is starting ...")
-        case Failure(e) => BuildConsole.error(e.getMessage)
-      }
+    if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
+      val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
+      val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
+      val mainC = quote(mainFile.getPath)
+      val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
+      verbose(cmd)
+      cmd.run()
+    } match {
+      case Success(_) => info("wait a little, code editor is starting ...")
+      case Failure(e) => BuildConsole.error(e.getMessage)
     }
 
     System.exit(0)
