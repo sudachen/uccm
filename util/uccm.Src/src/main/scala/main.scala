@@ -9,16 +9,14 @@ import compiler.Compiler
 import debugger.Debugger
 import buildscript.BuildScript
 import buildscript.BuildConfig
+import com.sudachen.uccm.buildconsole.BuildConsole
+import com.sudachen.uccm.components.Components
 import qteproj.QtProj
 import pragmas._
 
 object Target extends Enumeration {
-  val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte = Value
+  val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
 }
-
-case class Component ( home: Option[String] = None,
-                       info: Option[String] = None,
-                       download:Option[String] = None )
 
 case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        targets:  Set[Target.Value] = Set(Target.Build),
@@ -30,7 +28,8 @@ case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
                        color:  Boolean = false,
                        cflags:  List[String] = Nil,
                        softDevice: Option[String] = None,
-                       newMain: Boolean = false
+                       newMain: Boolean = false,
+                       yes: Boolean = false
                       )
 
 object Prog {
@@ -51,6 +50,10 @@ object Prog {
       opt[Unit]('c',"color").
         action( (_,c) => c.copy(color = true)).
         text("colorize output")
+
+      opt[Unit]('y',"yes").
+        action( (_,c) => c.copy(yes = true)).
+        text("enable required actions like download and install software")
 
       opt[Unit]('n',"new-main").
         action( (_,c) => c.copy(newMain = true)).
@@ -92,9 +95,9 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
-      opt[Unit]("qte").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
-        text("generate QTcreator generic project")
+      opt[Unit]("edit").
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
+        text("update project and start code editor")
 
       opt[Unit]("rebuild").
         action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
@@ -164,29 +167,19 @@ object Prog {
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
-    val panic_prefix = (if ( cmdlOpts.color ) Console.RED else "") + "[!] "
-    val info_prefix = (if ( cmdlOpts.color ) Console.GREEN else "") + "[>] "
-    val verbose_prefix = if ( cmdlOpts.color ) "\u001B[38m" else ""
-    val color_suffix = if ( cmdlOpts.color ) Console.RESET else ""
+    BuildConsole.useColors = cmdlOpts.color
+    BuildConsole.beVerbose = cmdlOpts.verbose
 
-    def panic(text:String) : Unit = {
-      println(panic_prefix+text+color_suffix)
-      System.exit(1)
-    }
+    val panic: String => Unit = BuildConsole.panic
+    val info: String => Unit = BuildConsole.info
+    val verbose: String => Unit = BuildConsole.verbose
 
-    def info(text:String) : Unit = {
-      println(info_prefix+text+color_suffix)
-    }
-
-    val mainFile : File = cmdlOpts.mainFile match {
+    val mainFile :File = cmdlOpts.mainFile match {
       case Some(f) => new File(f.getName)
       case None => new File("./main.c")
     }
 
     val projectDir = mainFile.getParentFile
-
-    def verbose(s:String) =
-      if (cmdlOpts.verbose) println(verbose_prefix + s + color_suffix )
 
     if ( !mainFile.exists && !cmdlOpts.newMain )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
@@ -215,7 +208,7 @@ object Prog {
     info(s"uccm is working now for board $targetBoard")
 
     val buildDir = new File(".",
-      s"~$targetBoard-${mainFile.getName.take(mainFile.getName.lastIndexOf("."))}"
+      s"~$targetBoard"
     )
 
     if ( !buildDir.exists ) buildDir.mkdirs()
@@ -225,12 +218,12 @@ object Prog {
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
-
-    if ( cmdlOpts.targets.contains(Target.Rebuild) && buildDir.exists ) {
+    val prepareBuildDir = !buildDir.exists
+    if ( cmdlOpts.targets.contains(Target.Rebuild) && !prepareBuildDir ) {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles{_.isFile}.foreach{_.delete}
-    } else if ( cmdlOpts.targets.contains(Target.Clean) && buildDir.exists ) {
+    } else if ( cmdlOpts.targets.contains(Target.Clean) && !prepareBuildDir ) {
       FileUtils.deleteDirectory(objDir)
       buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
@@ -246,28 +239,6 @@ object Prog {
         }
       case None => Some(s)
     }
-
-    val components = boardPragmas.foldLeft( Map[String,Component]() ) {
-      (components,prag) => prag match {
-        case UccmHome(tag,path) => components + (tag -> (components.get(tag) match {
-          case Some(c) => c.copy(home = Some(path))
-          case None => Component(home = Some(path))
-        }))
-        case UccmInfo(tag,text) => components + (tag -> (components.get(tag) match {
-          case Some(c) => c.copy(info = Some(text))
-          case None => Component(info = Some(text))
-        }))
-        case UccmDownload(tag,url) => components + (tag -> (components.get(tag) match {
-          case Some(c) => c.copy(download = Some(url))
-          case None => Component(download = Some(url))
-        }))
-        case _ => components
-      }
-    } +
-      ("@inc" -> Component(home = Some(incDir.getPath)),
-      "@obj" -> Component(home = Some(objDir.getPath)),
-      "@build" -> Component(home = Some(buildDir.getPath)),
-      "@src" -> Component(home = Some(".")))
 
     def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
 
@@ -286,24 +257,33 @@ object Prog {
 
     def expandHome(s:String):String = "(\\[([@\\w\\+\\.]+)\\])".r findFirstMatchIn s match {
       case None => s
-      case Some(m) => components.get(m.group(2)) match {
-        case Some(Component(None, info, Some(url))) =>
-          panic(s"looks like required to download ${m.group(2)} from $url");s
-        case Some(Component(Some(home), _, u)) =>
-          expandEnv(home) match {
-            case Some(path) if dirExists(path) => expandHome(s.replace(m.group(1),path))
-            case Some(path) =>
-              panic(s"${m.group(2)} home '$home' expands to nonexistant path '$path'");s
-            case None => u match {
-              case None =>
-                panic(s"looks like ${m.group(2)} home '$home' uses undefined environment variable");s
-              case Some(url) =>
-                panic(s"looks like required to download ${m.group(2)} from $url");s
-            }
-          }
+      case Some(m) if m.group(2).startsWith("@") => expandHome(s.replace(m.group(1), m.group(2) match {
+        case "@inc" => incDir.getPath
+        case "@obj" => objDir.getPath
+        case "@build" => buildDir.getPath
+        case "@src" => "."
         case _ =>
-          panic(s"unknown component ${m.group(2)}, could not expand compenent home");s
-      }
+          panic(s"unknown component ${m.group(2)}, could not expand compenent home");""
+      }))
+
+      case Some(m) =>
+        val comp = m.group(2)
+        if (Components.dflt.getComponentHome(comp).isEmpty)
+          if ( cmdlOpts.yes ) {
+            info(s"getting $comp now")
+            if (!Components.dflt.acquireComponent(comp))
+              panic(s"failed to download $comp")
+          } else {
+            panic(s"looks like it's required to download $comp, restart with -y")
+          }
+        val home = Components.dflt.getComponentHome(comp).get
+        expandEnv(home) match {
+          case Some(path) if dirExists(path) => expandHome(s.replace(m.group(1),path))
+          case Some(path) =>
+            panic(s"$comp home '$home' expands to nonexistant path '$path'");s
+          case None =>
+            panic(s"looks like $comp home '$home' uses undefined environment variable");s
+        }
     }
 
     def expandAlias(s:String):String = "(\\{([@\\w]+)\\})".r findFirstMatchIn s match {
@@ -314,7 +294,7 @@ object Prog {
         case Some(e) =>
           val f = new File(buildDir, m.group(2))
           val expand = expandHome(e)
-          if (!f.exists && new File(expand).isDirectory) {
+          if (!f.exists && dirExists(expand)) {
             verbose(s"$f => $expand")
             val cmdl = "cmd /c mklink /J \"" + f.getAbsolutePath.replace("/", "\\") + "\" \"" + expand.replace("/", "\\") + "\""
             info(cmdl)
@@ -324,7 +304,7 @@ object Prog {
       }
     }
 
-    val vendorWareMap = boardPragmas.foldLeft(Map[String, String]()) {
+    val softDeviceMap = boardPragmas.foldLeft(Map[String, String]()) {
       (vw, prag) =>
         prag match {
           case UccmSoftDevice(tag, pathToHex) => vw + (tag -> pathToHex)
@@ -349,8 +329,8 @@ object Prog {
           }
         }
 
-    if ( targetSoftDevice != "RAW" && !vendorWareMap.contains(targetSoftDevice) )
-      panic(s"required to use unknown softdevice ${targetSoftDevice}")
+    if ( targetSoftDevice != "RAW" && !softDeviceMap.contains(targetSoftDevice) )
+      panic(s"could not use unknown softdevice $targetSoftDevice")
 
     val targetCompiler: Compiler.Value = cmdlOpts.compiler match {
       case Some(cc) => cc
@@ -360,6 +340,25 @@ object Prog {
           case _ => cc
         }
       }
+    }
+
+    if ( !Compiler.exists(targetCompiler) ) {
+      if (!cmdlOpts.yes)
+        panic(s"looks like it's required to download $targetCompiler, restart with -y")
+      else {
+        if (!Compiler.install(targetCompiler))
+          panic(s"failed to download $targetCompiler")
+      }
+    }
+
+    if ( cmdlOpts.targets.contains(Target.Qte) || cmdlOpts.targets.contains(Target.QteStart) ) {
+      if ( QtProj.isRequiredToInstall )
+        if (!cmdlOpts.yes)
+          panic(s"looks like it's required to install QtCreator, restart with -y")
+        else {
+          if (!QtProj.install())
+            panic("failed to install")
+        }
     }
 
     val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
@@ -395,14 +394,14 @@ object Prog {
       wr.println("void main()")
       wr.println("{")
       wr.println("    ucSetup_Board();")
-      wr.println("    ucSetOn_BoardLed(0);")
+      wr.println("    ucSetOn_BoardLED(0);")
       wr.println("    for(;;) __NOP();")
       wr.println("}")
       wr.close()
     }
 
     def extractFromPreprocessor : BuildScript = {
-      val cc = expandHome(Compiler.ccPath(targetCompiler))
+      val cc = Compiler.ccPath(targetCompiler)
       val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(targetCompiler)}.i")
       val mainFilePath = mainFile.getPath
       val optSelector = cmdlOpts.buildConfig match {
@@ -410,7 +409,7 @@ object Prog {
         case BuildConfig.Debug => " -D_DEBUG "
       }
 
-      val gccPreprocCmdline = quote(cc) +
+      val gccPreprocCmdline = cc +
         " -E " +
         optSelector +
         xcflags.mkString(" ") +
@@ -422,7 +421,7 @@ object Prog {
         panic("failed to preprocess main C-file")
 
       Pragmas.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetCompiler,None,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,targetCompiler,None,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
@@ -479,9 +478,15 @@ object Prog {
     info(s"uccm is using softdevice ${buildScript.softDevice}")
 
     val targetDebugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else buildScript.debugger
-    if ( targetDebugger.isDefined )
+    if ( targetDebugger.isDefined ) {
       info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
-    else
+      if ( Debugger.isRequiredToInstallSoftware(targetDebugger.get) ) {
+        if ( cmdlOpts.yes )
+          Debugger.install(targetDebugger.get)
+        else
+          panic(s"looks like required to download and install ${Debugger.stringify(targetDebugger.get)} component, restart with -y")
+      }
+    } else
       info(s"uccm is not using any debugger")
 
     val dbgConnect:List[String] = targetDebugger match {
@@ -495,7 +500,7 @@ object Prog {
       case None => Nil
     }
 
-    if ( cmdlOpts.targets.contains(Target.Rebuild) )
+    if ( cmdlOpts.targets.contains(Target.Rebuild) || prepareBuildDir )
       buildScript.generated.foreach {
         case ( fname, content ) =>
           val text = content.replace("\\n","\n").replace("\\t","\t")
@@ -505,11 +510,8 @@ object Prog {
       }
 
     def compile(ls:List[String],source:String):List[String] = {
-      val cc = expandHome(Compiler.ccPath(buildScript.ccTool))
-      val asm:Option[String] = Compiler.asmPath(buildScript.ccTool) match {
-        case Some(x) => Some(expandHome(x))
-        case _ => None
-      }
+      val cc = Compiler.ccPath(buildScript.ccTool)
+      val asm = Compiler.asmPath(buildScript.ccTool)
       val srcFile = new File(source)
       val objFileName = srcFile.getName + ".obj"
       val objFile = new File(objDir,objFileName)
@@ -518,11 +520,11 @@ object Prog {
         info(s"compiling ${srcFile.getName} ...")
         val cmdline: String =
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
-            (List(quote(asm.get)) ++
-              buildScript.asflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
+            (asm.get ::
+              (buildScript.asflags ++
+              List(quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
           else
-            (List(quote(cc), "-c ") ++
+            (List(cc, "-c ") ++
               buildScript.cflags ++
               List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
         verbose(cmdline)
@@ -532,10 +534,10 @@ object Prog {
       objFile.getName :: ls
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte) )
-      QtProj.generate(mainFile,buildScript,buildDir,expandHome,verbose)
+    if ( cmdlOpts.targets.contains(Target.Qte)  )
+      QtProj.generate(mainFile,buildScript,buildDir,expandHome)
 
-    else if ( cmdlOpts.targets.contains(Target.Build) ) {
+    if ( cmdlOpts.targets.contains(Target.Build) ) {
 
       val objects = buildScript.sources.foldLeft(List[String]()) {
         compile
@@ -545,7 +547,7 @@ object Prog {
         compile
       }.reverse
 
-      val ld = expandHome(Compiler.ldPath(buildScript.ccTool))
+      val ld = Compiler.ldPath(buildScript.ccTool)
       val objFiles = (objects ++ modules).map { fn => new File(objDir, fn) }
 
       val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
@@ -555,21 +557,20 @@ object Prog {
       if (haveToRelink) {
         info("linking ...")
         List(targetBin, targetHex, targetElf).foreach { f => if (f.exists) f.delete }
-        val gccCmdline = (List(quote(ld)) ++ buildScript.ldflags ++ objFiles ++
-          List("-o", targetElf.getPath)).mkString(" ")
+        val gccCmdline = (ld :: (buildScript.ldflags ++ objFiles ++ List("-o", targetElf.getPath))).mkString(" ")
         verbose(gccCmdline)
         if (0 != gccCmdline.!)
           panic(s"failed to link ${targetElf.getName}")
-        val toHexCmdl = expandHome(Compiler.elfToHexCmdl(buildScript.ccTool, targetElf, targetHex))
+        val toHexCmdl = Compiler.elfToHexCmdl(buildScript.ccTool, targetElf, targetHex)
         verbose(toHexCmdl)
         if (0 != toHexCmdl.!)
           panic(s"failed to generate ${targetHex.getName}")
-        val toBinCmdl = expandHome(Compiler.elfToBinCmdl(buildScript.ccTool, targetElf, targetBin))
+        val toBinCmdl = Compiler.elfToBinCmdl(buildScript.ccTool, targetElf, targetBin)
         verbose(toBinCmdl)
         if (0 != toBinCmdl.!)
           panic(s"failed to generate ${targetBin.getName}")
         if ( buildScript.ccTool == Compiler.GCC ) {
-          val cmdl = expandHome(Compiler.odmpPath(buildScript.ccTool).get) + " -d -S " + targetElf.getPath
+          val cmdl = Compiler.odmpPath(buildScript.ccTool).get + " -d -S " + targetElf.getPath
           verbose(cmdl)
           if ( 0 != (cmdl #> targetAsm).! )
             panic(s"failed to generate ${targetAsm.getPath}")
@@ -588,37 +589,34 @@ object Prog {
             else
               cmdlOpts.targets
 
-          lazy val vendorWareHex: Option[File] = buildScript.softDevice match {
+          lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
             case "RAW" => None
             case tag =>
-              if ( vendorWareMap.contains(tag) ) {
-                val fileName = expandAlias(vendorWareMap(tag))
-                info(s"using vendor ware '$fileName'")
+              if ( softDeviceMap.contains(tag) ) {
+                val fileName = expandAlias(softDeviceMap(tag))
+                info(s"using softdevice '$fileName'")
                 Some(new File(fileName))
               } else {
-                panic(s"unknown vendor-ware $tag")
+                panic(s"unknown softdevice $tag")
                 None
               }
           }
 
           targetsOrder.filter {
             targets(_)
-          }.foreach { t =>
+          } foreach { t =>
             (t match {
               case Target.Erase =>
-                Debugger.erase(buildScript.debugger.get, verbose, dbgConnect)
+                Debugger.erase(buildScript.debugger.get, dbgConnect)
               case Target.Program =>
-                Debugger.program(buildScript.debugger.get, targetHex, verbose,
+                Debugger.program(buildScript.debugger.get, targetHex,
                   cmdlOpts.targets.contains(Target.Reset), dbgConnect)
               case Target.Reset =>
-                Debugger.reset(buildScript.debugger.get, verbose, dbgConnect)
+                Debugger.reset(buildScript.debugger.get, dbgConnect)
               case Target.Connect =>
-                Debugger.connect(buildScript.debugger.get, verbose, dbgConnect)
+                Debugger.connect(buildScript.debugger.get, dbgConnect)
               case Target.Softdevice =>
-                if ( vendorWareHex.isDefined )
-                  Debugger.program(buildScript.debugger.get, vendorWareHex.get, verbose, false, dbgConnect)
-                else
-                  panic("there is no vendorware")
+                Debugger.programSoftDevice(buildScript.debugger.get, dbgConnect, softDeviceHex)
             }) match {
               case Failure(f) =>
                 panic(f.getMessage)
@@ -626,11 +624,27 @@ object Prog {
             }
           }
         }
+
+      info("succeeded")
+
+      if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
+        val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
+        val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
+        val mainC = quote(mainFile.getPath)
+        val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
+        verbose(cmd)
+        cmd.run()
+      } match {
+        case Success(_) => info("wait a little, code editor is starting ...")
+        case Failure(e) => BuildConsole.error(e.getMessage)
+      }
     }
-    info("succeeded")
+
+    System.exit(0)
   }
 
   def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {
+
     val boardDir = new File(uccmHome,"uccm/board")
     val localBoardDir = new File(getCurrentDirectory,"board")
 
@@ -639,19 +653,19 @@ object Prog {
       case _ => Stream.empty
     }
 
-    val localBoardFiles : List[File] =
+    val localBoardFiles =
       if ( localBoardDir.exists && localBoardDir.isDirectory )
         localBoardDir.listFiles.toList
       else
         Nil
 
-    val boardPragmas: Option[List[UccmPragma]] = {
+    val boardPragmas = {
       if ( boardDir.exists && boardDir.isDirectory )
         f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
       else
         Stream.empty
     } find {
-        x => x.exists {
+        _.exists {
           case UccmBoard(`targetBoard`,_) => true
           case _ => false
         }

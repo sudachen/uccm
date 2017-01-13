@@ -19,7 +19,8 @@ object BuildConfig extends Enumeration {
   }
 }
 
-case class BuildScript(ccTool:Compiler.Value,
+case class BuildScript(boardName:String,
+                       ccTool:Compiler.Value,
                        debugger:Option[Debugger.Value],
                        config:BuildConfig.Value,
                        cflags:List[String] = Nil,
@@ -34,6 +35,9 @@ case class BuildScript(ccTool:Compiler.Value,
                        softDevice:String = "RAW") {
   def toXML : scala.xml.Node = {
     <uccm>
+      <board>
+        {boardName}
+      </board>
       <cctool>
         {Compiler.stringify(ccTool)}
       </cctool>
@@ -102,10 +106,11 @@ object BuildScript {
     def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
     def ns(s:String) = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
     BuildScript(
+      ns((xml\"board").text),
       Compiler.fromString(ns((xml\"cctool" ).text)).get,
       Debugger.fromString(ns((xml\"debugger" ).text)),
       BuildConfig.fromString(ns((xml\"config" ).text)).get,
-      softDevice = ns((xml\"vendorware" ).text),
+      softDevice = ns((xml\"softdevice" ).text),
       cflags = (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
       ldflags = (xml\"ldflags"\"flag").map{ x => ns(x.text)}.toList,
       asflags = (xml\"asflags"\"flag").map{ x => ns(x.text)}.toList,
@@ -115,19 +120,30 @@ object BuildScript {
       generated = (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
     )}
 
-  lazy val uccmDirectory : Option[String]  = {
+  lazy val uccmDirectory : String  = {
     val rJar = "file:(\\S+.jar)".r
     val rJarOne = "jar:file:(\\S+).jar!.+".r
     val rClass = "file:(\\S+)/".r
     classOf[BuildScript].getProtectionDomain.getCodeSource.getLocation.toURI.toURL.toString match {
-      case rJar(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rJarOne(path) => Some(new File(path).getParentFile.getAbsolutePath)
-      case rClass(path) => Some(new File(path).getAbsoluteFile.getParentFile.getParentFile.getParentFile.getParentFile.getParentFile.getPath)
-      case p => println(p); None
+      case rJar(path) => new File(path).getParentFile.getAbsolutePath
+      case rJarOne(path) => new File(path).getParentFile.getAbsolutePath
+      case rClass(path) => new File(path).getAbsoluteFile.getParentFile.getParentFile.getParentFile.getParentFile.getParentFile.getPath
+      case p =>
+        System.err.println("could not detect uCcm directory ")
+        System.exit(1); ""
     }
   }
 
-  def uccmDirectoryFile : File  = new File(uccmDirectory.get).getAbsoluteFile
+  lazy val uccmDirectoryFile : File  = new File(uccmDirectory).getAbsoluteFile
+
+  lazy val uccmRepoDirectory: String = {
+    sys.env.get("UCCM100REPO") match {
+      case Some(path) => path
+      case None => sys.env("LOCALAPPDATA") + "\\uCcm100Repo"
+    }
+  }
+
+  lazy val uccmRepoDirectoryFile: File = new File(uccmRepoDirectory).getAbsoluteFile
 
 }
 

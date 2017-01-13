@@ -66,7 +66,7 @@ object Pragmas {
     val rInclude = "^#include\\s*<(uccm/./././[\\/\\.\\-\\+\\w]+)>\\s*$".r
 
     def ns(s:String) = {
-      val ss = s.dropRight(s.length-s.lastIndexWhere { _ !=  ' ' }-1)
+      val ss = s.dropRight(s.length-s.lastIndexWhere {' '.!= }-1)
       if ( ss.length >= 2 && ss.startsWith("\"") && ss.endsWith("\"") )
         ss.drop(1).dropRight(1)
       else

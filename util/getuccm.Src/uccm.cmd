@@ -18,13 +18,17 @@ set PROGNAME=%~nx0
 if "%UCCM100REPO%"=="" set UCCM100REPO=%LOCALAPPDATA%\uCcm100Repo
 
 if not "%UCCM100DEV%"=="" (
+	echo "** Development uCcm version is using **"
 	call %UCCM100DEV%\uccm100.cmd %*
-	exit 0
+	if %errorlevel% NEQ 0 exit 1
+	goto :eof
 )
 
 if "%*"=="--uccm-update" (
+	if exist "%UCCM100REPO%\uccm-uccm100" rmdir /Q /S "%UCCM100REPO%\uccm-uccm100"
 	call :update_uccm
-	exit 0
+	if %errorlevel% NEQ 0 exit 1
+	goto :eof
 )
 
 if not exist "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" call :update_uccm
