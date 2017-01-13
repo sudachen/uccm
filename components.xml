@@ -97,6 +97,8 @@ Controller.prototype.IntroductionPageCallback = function() {
 
 Controller.prototype.TargetDirectoryPageCallback = function()
 {
+var checkBoxForm = gui.currentPageWidget().AssociateCommonFiletypesForm
+    checkBoxForm.AssociateCommonFiletypesCheckBox.checked = false;
     gui.currentPageWidget().TargetDirectoryLineEdit.setText("%UCCM100REPO%/uccm-qte420");
     gui.clickButton(buttons.NextButton);
 }
