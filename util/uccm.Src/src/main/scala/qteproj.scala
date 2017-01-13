@@ -140,13 +140,21 @@ object QtProj {
       case Some(nst) =>
         val rx = ".*\\[\\/](\\w+).xml$".r
         val patRepo = "%UCCM100REPO%"
+        val repoPath = BuildScript.uccmRepoDirectory.map{ case '\\' => '/' case x => x }
+        val patUccm = "%UCCM100HOME%"
+        val uccmPath = BuildScript.uccmDirectory.map{ case '\\' => '/' case x => x }
         val arcFile = new File(BuildScript.uccmDirectoryFile,"util/qte420-settings.zip")
 
         def expand(s:String):String = s.indexOf(patRepo) match {
           case n if n >= 0 =>
             val tail = s.substring(n+patRepo.length)
-            s.substring(0,n) + BuildScript.uccmRepoDirectory + expand(tail)
-          case _ => s
+            s.substring(0,n) + repoPath + expand(tail)
+          case _ => s.indexOf(uccmPath) match {
+            case n if n >= 0 =>
+              val tail = s.substring(n+patRepo.length)
+              s.substring(0,n) + uccmPath + expand(tail)
+            case _ => s
+          }
         }
 
         def p(n:String) : Option[String => String] = n match {
@@ -258,8 +266,8 @@ object QtProj {
     generateIncludes()
     generateFiles()
 
-    val env_uuid = "{83f78507-166f-4c5c-8568-06b199440095}"
-    val conf_uuid = "{296b767f-08bf-48e2-a566-3e4dc7192e6b}"
+    val env_uuid = "{d8039803-4279-4b90-ad93-64aaffce02ab}"
+    val conf_uuid = "{ad2775bb-c909-468e-91cc-e79a31036fe3}"
     val workDir = mainFile.getAbsoluteFile.getParentFile.getCanonicalFile
     val uccmCmd = new File(workDir,"uccm.cmd")
 
@@ -270,113 +278,95 @@ object QtProj {
     val uccmArgs = List(compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
 
     val qtUser =
-        <qtcreator>
-          <data>
-            <variable>EnvironmentId</variable>
-            <value type="QByteArray">{env_uuid}</value>
-          </data>
-          <data>
-            <variable>ProjectExplorer.Project.ActiveTarget</variable>
-            <value type="int">0</value>
-          </data>
-          <data>
-            <variable>ProjectExplorer.Project.Target.0</variable>
-            <valuemap type="QVariantMap">
-              <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">uccm</value>
-              <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">uccm</value>
-              <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">{conf_uuid}</value>
-              <value type="int" key="ProjectExplorer.Target.ActiveBuildConfiguration">0</value>
-              <value type="int" key="ProjectExplorer.Target.ActiveDeployConfiguration">0</value>
-              <value type="int" key="ProjectExplorer.Target.ActiveRunConfiguration">0</value>
-              <valuemap type="QVariantMap" key="ProjectExplorer.Target.BuildConfiguration.0">
-                <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">{workDir.getPath}</value>
+<qtcreator>
+  <data>
+    <variable>EnvironmentId</variable>
+    <value type="QByteArray">{env_uuid}</value>
+  </data>
+  <data>
+    <variable>ProjectExplorer.Project.ActiveTarget</variable>
+    <value type="int">0</value>
+  </data>
+  <data>
+    <variable>ProjectExplorer.Project.Target.0</variable>
+    <valuemap type="QVariantMap">
+      <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">uccm</value>
+      <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">uccm</value>
+      <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">{conf_uuid}</value>
+      <value type="int" key="ProjectExplorer.Target.ActiveBuildConfiguration">0</value>
+      <value type="int" key="ProjectExplorer.Target.ActiveDeployConfiguration">0</value>
+      <value type="int" key="ProjectExplorer.Target.ActiveRunConfiguration">0</value>
+      <valuemap type="QVariantMap" key="ProjectExplorer.Target.BuildConfiguration.0">
+        <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">{workDir.getPath}</value>
 
-                <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
-                  <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
-                    <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs}</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.ProcessStep</value>
-                  </valuemap>
-                  <value type="int" key="ProjectExplorer.BuildStepList.StepsCount">1</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Build</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.BuildSteps.Build</value>
-                </valuemap>
+        <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
+          <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
+            <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs}</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.ProcessStep</value>
+          </valuemap>
+          <value type="int" key="ProjectExplorer.BuildStepList.StepsCount">1</value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Build</value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.BuildSteps.Build</value>
+        </valuemap>
 
-                <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.1">
-                  <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
-                    <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --rebuild --qte</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.ProcessStep</value>
-                  </valuemap>
-                  <value type="int" key="ProjectExplorer.BuildStepList.StepsCount">1</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Clean</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.BuildSteps.Clean</value>
-                </valuemap>
+        <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.1">
+          <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
+            <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --rebuild --qte</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+            <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.ProcessStep</value>
+          </valuemap>
+          <value type="int" key="ProjectExplorer.BuildStepList.StepsCount">1</value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Clean</value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+          <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.BuildSteps.Clean</value>
+        </valuemap>
 
-                <value type="int" key="ProjectExplorer.BuildConfiguration.BuildStepListCount">2</value>
-                <value type="bool" key="ProjectExplorer.BuildConfiguration.ClearSystemEnvironment">false</value>
-                <valuelist type="QVariantList" key="ProjectExplorer.BuildConfiguration.UserEnvironmentChanges"/>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">UCCM</value>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">UCCM</value>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">GenericProjectManager.GenericBuildConfiguration</value>
-              </valuemap>
-              <value type="int" key="ProjectExplorer.Target.BuildConfigurationCount">1</value>
-              <value type="int" key="ProjectExplorer.Target.DeployConfigurationCount">0</value>
-              <valuemap type="QVariantMap" key="ProjectExplorer.Target.PluginSettings"/>
-              <valuemap type="QVariantMap" key="ProjectExplorer.Target.RunConfiguration.0">
-              </valuemap>
-
-              <value type="int" key="ProjectExplorer.Target.RunConfigurationCount">1</value>
-
-              <valuemap type="QVariantMap" key="ProjectExplorer.Target.DeployConfiguration.0">
-                <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
-                  <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
-                    <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --flash --reset</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Write firmware into uC Memory</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">Flash</value>
-                    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.ProcessStep</value>
-                  </valuemap>
-                  <value type="int" key="ProjectExplorer.BuildStepList.StepsCount">1</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Deploy</value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                  <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.BuildSteps.Deploy</value>
-                </valuemap>
-                <value type="int" key="ProjectExplorer.BuildConfiguration.BuildStepListCount">1</value>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Upload onto uC</value>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
-                <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">DeployToGenericLinux</value>
-              </valuemap>
-
-              <value type="int" key="ProjectExplorer.Target.DeployConfigurationCount">1</value>
-
-            </valuemap>
-          </data>
-          <data>
-            <variable>ProjectExplorer.Project.TargetCount</variable>
-            <value type="int">1</value>
-          </data>
-          <data>
-            <variable>ProjectExplorer.Project.Updater.FileVersion</variable>
-            <value type="int">18</value>
-          </data>
-          <data>
-            <variable>Version</variable>
-            <value type="int">18</value>
-          </data>
-        </qtcreator>
+        <value type="int" key="ProjectExplorer.BuildConfiguration.BuildStepListCount">2</value>
+        <value type="bool" key="ProjectExplorer.BuildConfiguration.ClearSystemEnvironment">false</value>
+        <valuelist type="QVariantList" key="ProjectExplorer.BuildConfiguration.UserEnvironmentChanges"/>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">UCCM</value>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">UCCM</value>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">GenericProjectManager.GenericBuildConfiguration</value>
+      </valuemap>
+      <value type="int" key="ProjectExplorer.Target.BuildConfigurationCount">1</value>
+      <value type="int" key="ProjectExplorer.Target.DeployConfigurationCount">0</value>
+      <valuemap type="QVariantMap" key="ProjectExplorer.Target.PluginSettings"/>
+      <valuemap type="QVariantMap" key="ProjectExplorer.Target.RunConfiguration.0">
+        <value type="int" key="PE.EnvironmentAspect.Base">2</value>
+        <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
+        <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.Arguments">{uccmArgs} --program --reset</value>
+        <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.Executable">{uccmCmd.getPath}</value>
+        <value type="QString" key="ProjectExplorer.CustomExecutableRunConfiguration.WorkingDirectory">{workDir.getPath}</value>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Program and Reset</value>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+        <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">ProjectExplorer.CustomExecutableRunConfiguration</value>
+      </valuemap>
+      <value type="int" key="ProjectExplorer.Target.RunConfigurationCount">1</value>
+    </valuemap>
+  </data>
+  <data>
+    <variable>ProjectExplorer.Project.TargetCount</variable>
+    <value type="int">1</value>
+  </data>
+  <data>
+    <variable>ProjectExplorer.Project.Updater.FileVersion</variable>
+    <value type="int">18</value>
+  </data>
+  <data>
+    <variable>Version</variable>
+    <value type="int">18</value>
+  </data>
+</qtcreator>
 
     scala.xml.XML.save(
       f_creator_user.getPath,

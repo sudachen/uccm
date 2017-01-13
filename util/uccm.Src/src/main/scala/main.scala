@@ -95,13 +95,9 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
-      opt[Unit]("project").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
-        text("update project files")
-
       opt[Unit]("edit").
-        action( (_,c) => c.copy(targets = c.targets + Target.QteStart)).
-        text("update project files and start code editor")
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
+        text("update project and start code editor")
 
       opt[Unit]("rebuild").
         action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
@@ -634,7 +630,8 @@ object Prog {
       if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
         val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
         val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
-        val cmd = QtProj.qteExe + " -settingspath " + settings + " " + project
+        val mainC = quote(mainFile.getPath)
+        val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
         verbose(cmd)
         cmd.run()
       } match {
