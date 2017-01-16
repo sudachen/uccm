@@ -14,6 +14,8 @@ import com.sudachen.uccm.components.Components
 import qteproj.QtProj
 import pragmas._
 
+import scala.io.Source
+
 object Target extends Enumeration {
   val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
 }
@@ -37,7 +39,7 @@ object Prog {
   def main(argv: Array[String]): Unit = {
 
     val cmdlParser = new scopt.OptionParser[CmdlOptions]("uccm") {
-      head("Alexey Sudachen' uC cortex-m build manager, goo.gl/a9irI7")
+      head("Alexey Sudachen' uC cortex-m build manager, goo.gl/mKjRQ8")
       help("help").
         text("show this help and exit")
 
@@ -83,7 +85,7 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Program)).
         text("reprogram uC flash memory")
 
-      opt[Unit]("reset").
+      opt[Unit]('r',"reset").
         action( (_,c) => c.copy(targets = c.targets + Target.Reset)).
         text("reset uC")
 
@@ -94,6 +96,10 @@ object Prog {
       opt[String]('b',"board").
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
+
+      opt[Unit]('j',"project").
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        text("update project only")
 
       opt[Unit]("edit").
         action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
@@ -164,6 +170,8 @@ object Prog {
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
   def quote(s:String):String = '"' + s + '"'
+  def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
+  def ns(s:String):String = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
@@ -463,15 +471,17 @@ object Prog {
       }
     }
 
+    val buildScriptExists = buildScriptFile.exists
+
     val buildScript =
-      if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
+      if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
         extractFromPreprocessor
       else
         BuildScript.fromXML(scala.xml.XML.loadFile(buildScriptFile))
 
-    if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
-      scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
-    else {
+    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) ) {
+      scala.xml.XML.save(buildScriptFile.getCanonicalPath, buildScript.toXML)
+    } else {
       info(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
     }
 
@@ -509,14 +519,42 @@ object Prog {
           wr.close()
       }
 
-    def compile(ls:List[String],source:String):List[String] = {
+    val depsFile = new File(buildDir,"depends.txt")
+    def mkdeps() = {
+      def rightSlash(s:String) = s.map{ case '\\' => '/' case x => x }
+      def local(str:String) = rightSlash(str) match { case s => if (s.startsWith("./")) s.drop(2) else s }
+      val cc = Compiler.ccPath(targetCompiler)
+      val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
+      val where = local(buildDir.getPath)
+      val rx = ("("+where+"/inc/[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
+      if ( depsFile.exists ) depsFile.delete()
+      val wr = new FileWriter(depsFile, false)
+      val pl = ProcessLogger(s => {
+        rx.findAllMatchIn(rightSlash(s)).foreach {
+          case rx(path) =>
+            wr.write(ns(path)+"\n")
+          case _ =>
+        }},
+        s => Unit)
+      BuildConsole.verbose(cmdl)
+      cmdl!pl
+      wr.close()
+    }
+
+    if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+      !depsFile.exists ||
+      FileUtils.isFileOlder(depsFile,mainFile) )
+      mkdeps()
+
+    def compile(lt:Long)(ls:List[String],source:String):List[String] = {
       val cc = Compiler.ccPath(buildScript.ccTool)
       val asm = Compiler.asmPath(buildScript.ccTool)
       val srcFile = new File(source)
       val objFileName = srcFile.getName + ".obj"
       val objFile = new File(objDir,objFileName)
       if ( cmdlOpts.targets.contains(Target.Rebuild) ||
-        !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
+        !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ||
+        ( lt != 0  && objFile.lastModified() < lt ) ) {
         info(s"compiling ${srcFile.getName} ...")
         val cmdline: String =
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
@@ -539,12 +577,21 @@ object Prog {
 
     if ( cmdlOpts.targets.contains(Target.Build) ) {
 
+      val deps = {
+        val f = Source.fromFile(depsFile)
+        try { f.getLines().toList } finally { f.close() }
+      }
+
+      val lt = deps.foldLeft(0L) {
+        (t, f) => Math.max(new File(f).lastModified(),t)
+      }
+
       val objects = buildScript.sources.foldLeft(List[String]()) {
-        compile
+        compile(lt)
       }.reverse
 
       val modules = buildScript.modules.foldLeft(List[String]()) {
-        compile
+        compile(0L)
       }.reverse
 
       val ld = Compiler.ldPath(buildScript.ccTool)

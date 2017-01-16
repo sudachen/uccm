@@ -25,7 +25,7 @@ if "%*"=="--self-update" (
 )
 
 if not "%UCCM100DEV%"=="" (
-	echo "** Development uCcm version is using **"
+	echo "*** Development uCcm version is using now ***"
 	call %UCCM100DEV%\uccm100.cmd %*
 	if %errorlevel% NEQ 0 exit 1
 	goto :eof
