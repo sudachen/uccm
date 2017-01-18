@@ -1,19 +1,9 @@
 package com.sudachen.uccm
+
 import java.io.{File, FileWriter, PrintWriter}
-
 import org.apache.commons.io.FileUtils
-
 import scala.util.{Failure, Success, Try}
 import sys.process._
-import compiler.Compiler
-import debugger.Debugger
-import buildscript.BuildScript
-import buildscript.BuildConfig
-import com.sudachen.uccm.buildconsole.BuildConsole
-import com.sudachen.uccm.components.Components
-import qteproj.QtProj
-import pragmas._
-
 import scala.io.Source
 
 object Target extends Enumeration {
@@ -169,9 +159,6 @@ object Prog {
   }
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
-  def quote(s:String):String = '"' + s + '"'
-  def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
-  def ns(s:String):String = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
@@ -230,10 +217,10 @@ object Prog {
     if ( cmdlOpts.targets.contains(Target.Rebuild) ) {
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
-      buildDir.listFiles{_.isFile}.foreach{_.delete}
+      buildDir.listFiles.filter{_.isFile}.foreach{_.delete}
     } else if ( cmdlOpts.targets.contains(Target.Clean) ) {
       FileUtils.deleteDirectory(objDir)
-      buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
+      buildDir.listFiles.filter{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
 
     if ( !objDir.exists ) objDir.mkdirs()
@@ -409,8 +396,10 @@ object Prog {
     }
 
     def extractFromPreprocessor : BuildScript = {
+
       val cc = Compiler.ccPath(targetCompiler)
       val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(targetCompiler)}.i")
+      tempFile.deleteOnExit()
       val mainFilePath = mainFile.getPath
       val optSelector = cmdlOpts.buildConfig match {
         case BuildConfig.Release => " -D_RELEASE "
@@ -473,6 +462,29 @@ object Prog {
 
     val buildScriptExists = buildScriptFile.exists
 
+    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
+      Try { Import.importAll(mainFile,ImportState(Import.loadCache())) } match {
+        case Success(is) =>
+          is.imports.foreach {
+            imp => Try {
+              val userDir = new File(incDir, s"${imp.ghUser}")
+              if (!userDir.exists) userDir.mkdir()
+              val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
+              val toWhere = new File(incDir, s"${imp.ghUser}/${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
+              val cmdl = List("cmd", "/c", "mklink", "/J", Util.quote(toWhere), Util.quote(fromWhere)).mkString(" ")
+              verbose(cmdl)
+              cmdl.!
+            } match {
+              case Success(ecode) =>
+                if ( ecode != 0 )
+                  panic("could not create simbolic link to module")
+              case Failure(e) =>
+                panic(e.getMessage)
+            }
+          }
+        case Failure(e) => panic(e.getMessage)
+      }
+
     val buildScript =
       if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
         extractFromPreprocessor
@@ -529,12 +541,12 @@ object Prog {
       val rx = ("("+where+"/inc/[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
       if ( depsFile.exists ) depsFile.delete()
       val wr = new FileWriter(depsFile, false)
-      val pl = ProcessLogger(s => {
+      val pl = ProcessLogger(s =>
         rx.findAllMatchIn(rightSlash(s)).foreach {
           case rx(path) =>
-            wr.write(ns(path)+"\n")
+            wr.write(Util.ns(path)+"\n")
           case _ =>
-        }},
+        },
         s => Unit)
       BuildConsole.verbose(cmdl)
       cmdl!pl
@@ -560,11 +572,11 @@ object Prog {
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
             (asm.get ::
               (buildScript.asflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
+              List(Util.quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
           else
             (List(cc, "-c ") ++
               buildScript.cflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
+              List(Util.quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
         verbose(cmdline)
         if (0 != cmdline.!)
           panic(s"failed to compile ${srcFile.getName}")
@@ -579,7 +591,7 @@ object Prog {
 
       val deps = {
         val f = Source.fromFile(depsFile)
-        try { f.getLines().toList } finally { f.close() }
+        try f.getLines.toList finally f.close()
       }
 
       val lt = deps.foldLeft(0L) {
@@ -676,9 +688,9 @@ object Prog {
     info("succeeded")
 
     if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
-      val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
-      val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
-      val mainC = quote(mainFile.getPath)
+      val project = Util.quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
+      val settings = Util.quote(QtProj.qteSettingsFile.getAbsolutePath)
+      val mainC = Util.quote(mainFile.getPath)
       val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
       verbose(cmd)
       cmd.run()

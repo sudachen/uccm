@@ -1,8 +1,7 @@
 
-package com.sudachen.uccm.pragmas
+package com.sudachen.uccm
 
 import java.io.File
-import com.sudachen.uccm.buildscript.BuildScript
 
 class UccmPragma
 case class UccmAlias(tag:String, value:String) extends UccmPragma
@@ -21,6 +20,7 @@ case class UccmDownload(tag:String, value:String) extends UccmPragma
 case class UccmSoftDevice(tag:String, value:String) extends UccmPragma
 case class UccmSoftDeviceAls(tag:String, value:String) extends UccmPragma
 case class UccmDebugger(tag:String, value:String) extends UccmPragma
+case class UccmImport(accname:String, modname:String) extends UccmPragma
 
 object Pragmas {
 
@@ -64,6 +64,7 @@ object Pragmas {
     val rInfo    = "#pragma\\s*uccm\\s*info\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rDownload= "#pragma\\s*uccm\\s*download\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rInclude = "^#include\\s*<(uccm/./././[\\/\\.\\-\\+\\w]+)>\\s*$".r
+    val rImport  = "^#include\\s*<~/(\\w+)/(\\w+)/import.h>\\s*$".r
 
     def ns(s:String) = {
       val ss = s.dropRight(s.length-s.lastIndexWhere {' '.!= }-1)
@@ -90,6 +91,7 @@ object Pragmas {
       case rSoftDeviceAls(tag,value) => Some(UccmSoftDeviceAls(tag,ns(value)))
       case rSoftDevice(tag,value) => Some(UccmSoftDevice(tag,ns(value)))
       case rDebugger(tag,value) => Some(UccmDebugger(tag,ns(value)))
+      case rImport(accname,modname) => Some(UccmImport(accname,modname))
       case _ => None
     }
 

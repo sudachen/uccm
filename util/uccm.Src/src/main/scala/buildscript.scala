@@ -1,8 +1,6 @@
-package com.sudachen.uccm.buildscript
+package com.sudachen.uccm
 
 import java.io.File
-import com.sudachen.uccm.compiler.Compiler
-import com.sudachen.uccm.debugger.Debugger
 
 object BuildConfig extends Enumeration {
   val Debug, Release = Value

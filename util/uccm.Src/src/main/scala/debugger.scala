@@ -1,34 +1,10 @@
-package com.sudachen.uccm.debugger
-
+package com.sudachen.uccm
 import java.io.File
-
-import com.sudachen.uccm.buildconsole.BuildConsole
-import com.sudachen.uccm.components.Components
-
-import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 import sys.process._
 
 object Debugger extends Enumeration {
   val STLINK, JLINK, NRFJPROG = Value
-
-  private[Debugger] def ns(s: String): String = s.dropWhile {
-    _.isSpaceChar
-  }.reverse.dropWhile {
-    _.isSpaceChar
-  }.reverse
-
-  private[Debugger] def quote(s: String): String = "\"" + s + "\""
-
-  private[Debugger] def winExePath(s: String): String = quote {
-    s.map {
-      case '/' => '\\'
-      case '\"' => '\u0000'
-      case c => c
-    }.filter {
-      '\u0000'.!=
-    }
-  }
 
   def fromString(name: String): Option[Value] = name match {
     case "stlink" => Some(STLINK)
@@ -66,7 +42,7 @@ object Debugger extends Enumeration {
       path
     }.collectFirst { case Some(x) => x } match {
       case Some(path) =>
-        val exeFile = ns(path) + "nrfjprog.exe"
+        val exeFile = Util.ns(path) + "nrfjprog.exe"
         if (new File(exeFile).exists)
           Some(exeFile)
         else
@@ -78,7 +54,7 @@ object Debugger extends Enumeration {
   private[Debugger] def getNrfjprogCli: Option[String] = {
     findNrfjprog match {
       case Success(optCli) => optCli match {
-        case Some(s) => Some(winExePath(s))
+        case Some(s) => Some(Util.winExePath(s))
         case None => None
       }
       case Failure(e) =>
@@ -119,7 +95,7 @@ object Debugger extends Enumeration {
   private[Debugger] def getStlinkCli: Option[String] = {
     findStlinkCli match {
       case Success(optCli) => optCli match {
-        case Some(s) => Some(winExePath(s))
+        case Some(s) => Some(Util.winExePath(s))
         case None => None
       }
       case Failure(e) =>

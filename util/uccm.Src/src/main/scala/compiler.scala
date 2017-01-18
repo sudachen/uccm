@@ -1,34 +1,12 @@
-package com.sudachen.uccm.compiler
+package com.sudachen.uccm
 
 import java.io.File
 
-import com.sudachen.uccm.buildconsole.BuildConsole
-import com.sudachen.uccm.components.Components
-
 import scala.sys.process._
 import scala.util.{Failure, Success, Try}
-import scala.util.matching.Regex
 
 object Compiler extends Enumeration {
   val GCC, ARMCC = Value
-
-  private[Compiler] def ns(s: String): String = s.dropWhile {
-    _.isSpaceChar
-  }.reverse.dropWhile {
-    _.isSpaceChar
-  }.reverse
-
-  private[Compiler] def quote(s: String): String = "\"" + s + "\""
-
-  private[Compiler] def winExePath(s: String): String = quote {
-    s.map {
-      case '/' => '\\'
-      case '\"' => '\u0000'
-      case c => c
-    }.filter {
-      '\u0000'.!=
-    }
-  }
 
   def fromString(name:String): Option[Value] = name match {
     case "armcc" => Some(ARMCC)
@@ -73,7 +51,7 @@ object Compiler extends Enumeration {
         case Some(s) =>
           val f = new File(s+"\\bin\\"+tool)
           if ( f.exists )
-            Some(winExePath(f.getAbsolutePath))
+            Some(Util.winExePath(f.getAbsolutePath))
           else
             None
         case None => None
@@ -113,7 +91,7 @@ object Compiler extends Enumeration {
     Components.dflt.getComponentHome("gcc") match {
     case Some(home) =>
       val f = new File(home+"\\bin\\arm-none-eabi-"+tool)
-      winExePath(f.getAbsolutePath)
+      Util.winExePath(f.getAbsolutePath)
     case None =>
       BuildConsole.panic("gcc component is not installed"); ""
   }
@@ -128,7 +106,7 @@ object Compiler extends Enumeration {
       case Some(gccHome) =>
         val f = new File(gccHome+"\\lib\\gcc\\arm-none-eabi")
         List(gccHome+"\\arm-none-eabi\\include") ++
-          f.listFiles{ _.isDirectory }.map{ x=> new File(x,"include").getAbsolutePath }
+          f.listFiles.filter{ _.isDirectory }.map{ x=> new File(x,"include").getAbsolutePath }
     }
    }
 

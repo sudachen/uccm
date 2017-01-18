@@ -1,4 +1,4 @@
-package com.sudachen.uccm.buildconsole
+package com.sudachen.uccm
 
 object BuildConsole {
 
