@@ -36,7 +36,8 @@ public class GetUccm {
 
             System.out.println("it uses UCCM repo "+uccmRepo.getAbsolutePath());
 
-            File uccm100Zip = File.createTempFile("uccm100", ".zip");
+            File uccm100Zip = File.createTempFile("uccm100", ".zip");  
+            uccm100Zip.deleteOnExit();
             OutputStream os = new FileOutputStream(uccm100Zip);
             byte[] buffer = new byte[102400];
             int totalBytesRead = 0;

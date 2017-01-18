@@ -1,18 +1,10 @@
 package com.sudachen.uccm
+
 import java.io.{File, FileWriter, PrintWriter}
-
 import org.apache.commons.io.FileUtils
-
 import scala.util.{Failure, Success, Try}
 import sys.process._
-import compiler.Compiler
-import debugger.Debugger
-import buildscript.BuildScript
-import buildscript.BuildConfig
-import com.sudachen.uccm.buildconsole.BuildConsole
-import com.sudachen.uccm.components.Components
-import qteproj.QtProj
-import pragmas._
+import scala.io.Source
 
 object Target extends Enumeration {
   val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
@@ -37,7 +29,7 @@ object Prog {
   def main(argv: Array[String]): Unit = {
 
     val cmdlParser = new scopt.OptionParser[CmdlOptions]("uccm") {
-      head("Alexey Sudachen' uC cortex-m build manager, goo.gl/a9irI7")
+      head("Alexey Sudachen' uC cortex-m build manager, goo.gl/mKjRQ8")
       help("help").
         text("show this help and exit")
 
@@ -83,7 +75,7 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Program)).
         text("reprogram uC flash memory")
 
-      opt[Unit]("reset").
+      opt[Unit]('r',"reset").
         action( (_,c) => c.copy(targets = c.targets + Target.Reset)).
         text("reset uC")
 
@@ -95,8 +87,12 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
+      opt[Unit]('j',"project").
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        text("update project only")
+
       opt[Unit]("edit").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
         text("update project and start code editor")
 
       opt[Unit]("rebuild").
@@ -163,7 +159,6 @@ object Prog {
   }
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
-  def quote(s:String):String = '"' + s + '"'
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
@@ -211,25 +206,29 @@ object Prog {
       s"~$targetBoard"
     )
 
+    val prepareBuildDir = !buildDir.exists
     if ( !buildDir.exists ) buildDir.mkdirs()
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
+    val impDir = new File(incDir,"~")
     val targetElf = new File(buildDir,"firmware.elf")
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
-    val prepareBuildDir = !buildDir.exists
-    if ( cmdlOpts.targets.contains(Target.Rebuild) && !prepareBuildDir ) {
+    if ( cmdlOpts.targets.contains(Target.Rebuild) ) {
+      if ( impDir.exists )
+        impDir.listFiles(_.isDirectory).foreach{_.listFiles().foreach{_.delete()}}
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
-      buildDir.listFiles{_.isFile}.foreach{_.delete}
-    } else if ( cmdlOpts.targets.contains(Target.Clean) && !prepareBuildDir ) {
+      buildDir.listFiles.filter{_.isFile}.foreach{_.delete}
+    } else if ( cmdlOpts.targets.contains(Target.Clean) ) {
       FileUtils.deleteDirectory(objDir)
-      buildDir.listFiles{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
+      buildDir.listFiles.filter{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
 
     if ( !objDir.exists ) objDir.mkdirs()
     if ( !incDir.exists ) incDir.mkdirs()
+    if ( !impDir.exists ) impDir.mkdirs()
 
     def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
       case Some(m) =>
@@ -401,8 +400,10 @@ object Prog {
     }
 
     def extractFromPreprocessor : BuildScript = {
+
       val cc = Compiler.ccPath(targetCompiler)
       val tempFile = File.createTempFile("uccm",s"-${Compiler.stringify(targetCompiler)}.i")
+      tempFile.deleteOnExit()
       val mainFilePath = mainFile.getPath
       val optSelector = cmdlOpts.buildConfig match {
         case BuildConfig.Release => " -D_RELEASE "
@@ -463,15 +464,41 @@ object Prog {
       }
     }
 
+    val buildScriptExists = buildScriptFile.exists
+
+    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
+      Try { Import.importAll(mainFile,ImportState(Import.loadCache())) } match {
+        case Success(is) =>
+          is.imports.foreach {
+            imp => Try {
+              val userDir = new File(impDir, s"${imp.ghUser}")
+              if (!userDir.exists) userDir.mkdir()
+              val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
+              val toWhere = new File(userDir, s"${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
+              val cmdl = List("cmd", "/c", "mklink", "/J", Util.quote(toWhere), Util.quote(fromWhere)).mkString(" ")
+              verbose(cmdl)
+              cmdl.!
+            } match {
+              case Success(ecode) =>
+                if ( ecode != 0 )
+                  panic("could not create simbolic link to module")
+              case Failure(e) =>
+                BuildConsole.panicBt(e.getMessage,e.getStackTrace)
+            }
+          }
+        case Failure(e) =>
+          BuildConsole.panicBt(e.getMessage,e.getStackTrace)
+      }
+
     val buildScript =
-      if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
+      if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
         extractFromPreprocessor
       else
         BuildScript.fromXML(scala.xml.XML.loadFile(buildScriptFile))
 
-    if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
-      scala.xml.XML.save(buildScriptFile.getCanonicalPath,buildScript.toXML)
-    else {
+    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) ) {
+      scala.xml.XML.save(buildScriptFile.getCanonicalPath, buildScript.toXML)
+    } else {
       info(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
     }
 
@@ -509,24 +536,52 @@ object Prog {
           wr.close()
       }
 
-    def compile(ls:List[String],source:String):List[String] = {
+    val depsFile = new File(buildDir,"depends.txt")
+    def mkdeps() = {
+      def rightSlash(s:String) = s.map{ case '\\' => '/' case x => x }
+      def local(str:String) = rightSlash(str) match { case s => if (s.startsWith("./")) s.drop(2) else s }
+      val cc = Compiler.ccPath(targetCompiler)
+      val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
+      val where = local(buildDir.getPath)
+      val rx = ("("+where+"/inc/[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
+      if ( depsFile.exists ) depsFile.delete()
+      val wr = new FileWriter(depsFile, false)
+      val pl = ProcessLogger(s =>
+        rx.findAllMatchIn(rightSlash(s)).foreach {
+          case rx(path) =>
+            wr.write(Util.ns(path)+"\n")
+          case _ =>
+        },
+        s => Unit)
+      BuildConsole.verbose(cmdl)
+      cmdl!pl
+      wr.close()
+    }
+
+    if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+      !depsFile.exists ||
+      FileUtils.isFileOlder(depsFile,mainFile) )
+      mkdeps()
+
+    def compile(lt:Long)(ls:List[String],source:String):List[String] = {
       val cc = Compiler.ccPath(buildScript.ccTool)
       val asm = Compiler.asmPath(buildScript.ccTool)
       val srcFile = new File(source)
       val objFileName = srcFile.getName + ".obj"
       val objFile = new File(objDir,objFileName)
       if ( cmdlOpts.targets.contains(Target.Rebuild) ||
-        !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ) {
+        !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ||
+        ( lt != 0  && objFile.lastModified() < lt ) ) {
         info(s"compiling ${srcFile.getName} ...")
         val cmdline: String =
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
             (asm.get ::
               (buildScript.asflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
+              List(Util.quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
           else
             (List(cc, "-c ") ++
               buildScript.cflags ++
-              List(quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
+              List(Util.quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
         verbose(cmdline)
         if (0 != cmdline.!)
           panic(s"failed to compile ${srcFile.getName}")
@@ -539,12 +594,21 @@ object Prog {
 
     if ( cmdlOpts.targets.contains(Target.Build) ) {
 
+      val deps = {
+        val f = Source.fromFile(depsFile)
+        try f.getLines.toList finally f.close()
+      }
+
+      val lt = deps.foldLeft(0L) {
+        (t, f) => Math.max(new File(f).lastModified(),t)
+      }
+
       val objects = buildScript.sources.foldLeft(List[String]()) {
-        compile
+        compile(lt)
       }.reverse
 
       val modules = buildScript.modules.foldLeft(List[String]()) {
-        compile
+        compile(0L)
       }.reverse
 
       val ld = Compiler.ldPath(buildScript.ccTool)
@@ -569,16 +633,16 @@ object Prog {
         verbose(toBinCmdl)
         if (0 != toBinCmdl.!)
           panic(s"failed to generate ${targetBin.getName}")
-        if ( buildScript.ccTool == Compiler.GCC ) {
+        if (buildScript.ccTool == Compiler.GCC) {
           val cmdl = Compiler.odmpPath(buildScript.ccTool).get + " -d -S " + targetElf.getPath
           verbose(cmdl)
-          if ( 0 != (cmdl #> targetAsm).! )
+          if (0 != (cmdl #> targetAsm).!)
             panic(s"failed to generate ${targetAsm.getPath}")
         }
       }
 
-      if ( cmdlOpts.targets.intersect(Set(Target.Softdevice,Target.Erase,Target.Program,Target.Reset,Target.Connect)).nonEmpty )
-        if ( targetDebugger.isEmpty )
+      if (cmdlOpts.targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
+        if (targetDebugger.isEmpty)
           panic("debuger is not defined")
         else {
           val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
@@ -592,7 +656,7 @@ object Prog {
           lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
             case "RAW" => None
             case tag =>
-              if ( softDeviceMap.contains(tag) ) {
+              if (softDeviceMap.contains(tag)) {
                 val fileName = expandAlias(softDeviceMap(tag))
                 info(s"using softdevice '$fileName'")
                 Some(new File(fileName))
@@ -624,20 +688,20 @@ object Prog {
             }
           }
         }
+    }
 
-      info("succeeded")
+    info("succeeded")
 
-      if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
-        val project = quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
-        val settings = quote(QtProj.qteSettingsFile.getAbsolutePath)
-        val mainC = quote(mainFile.getPath)
-        val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
-        verbose(cmd)
-        cmd.run()
-      } match {
-        case Success(_) => info("wait a little, code editor is starting ...")
-        case Failure(e) => BuildConsole.error(e.getMessage)
-      }
+    if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
+      val project = Util.quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
+      val settings = Util.quote(QtProj.qteSettingsFile.getAbsolutePath)
+      val mainC = Util.quote(mainFile.getPath)
+      val cmd = List(QtProj.qteExe,"-settingspath",settings,project,mainC).mkString(" ")
+      verbose(cmd)
+      cmd.run()
+    } match {
+      case Success(_) => info("wait a little, code editor is starting ...")
+      case Failure(e) => BuildConsole.error(e.getMessage)
     }
 
     System.exit(0)
