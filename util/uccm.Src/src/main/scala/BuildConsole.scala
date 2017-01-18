@@ -42,6 +42,15 @@ object BuildConsole {
       }
   }
 
+  def panicBt(text: String, bt: Array[StackTraceElement]) :Unit = {
+    if ( beVerbose )
+      bt.take(9).foreach { x =>
+        System.out.println(verbose_prefix + x.toString + color_suffix)
+      }
+    System.out.println(panic_prefix+text+color_suffix)
+    System.exit(1)
+  }
+
   def panic_prefix :String = (if ( useColors ) Console.RED else "") + "[!] "
   def info_prefix :String = (if ( useColors ) Console.GREEN else "") + "[>] "
   def verbose_prefix :String = if (useColors) "\u001B[38m" else ""

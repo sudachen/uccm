@@ -67,9 +67,13 @@ object Util {
     }
   }
 
-  def download(url:String, downloadDir:File) : File = {
+  def download(url:String, downloadDir:File, fName: Option[String] = None) : File = {
 
-    val dst = new File(downloadDir,new File(url).getName)
+    val dst = fName match {
+      case Some(n) => new File(downloadDir,n)
+      case None => new File(downloadDir,new File(url).getName)
+    }
+
     val dstSha1 = new File(dst.getPath+".sha1")
     val dstPart = new File(dst.getPath+".part")
 
@@ -81,8 +85,7 @@ object Util {
       if ( dstSha1.exists ) dstSha1.delete
 
       val urlObj = new URL(url)
-      System.out.print(s"connecting to ${urlObj.getHost} ...")
-      System.out.flush()
+      System.out.println(s"connecting to ${urlObj.getHost} ...")
       val con = urlObj.openConnection().asInstanceOf[HttpURLConnection]
       try {
         val is = con.getInputStream
@@ -97,7 +100,7 @@ object Util {
         }
 
         try {
-          System.out.print("\ndownloading ")
+          System.out.print("downloading ")
           if ( length < 0 )
             System.out.print("... ")
           System.out.flush()

@@ -199,7 +199,7 @@ object QtProj {
       val cc = Compiler.ccPath(buildScript.ccTool)
       val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
       val where = local(buildDir.getPath)
-      val rx = ("("+where+"/[/\\w\\.]+.h)").r
+      val rx = ("("+where+"/[/\\~\\w\\.]+.h)").r
       val pl = ProcessLogger(s => {
         rx.findAllMatchIn(rightSlash(s)).foreach {
           case rx(path) =>

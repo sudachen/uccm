@@ -16,9 +16,13 @@ object Import {
   }
 
   def cacheToXML(imports:List[Import]): xml.Node = {
-    <imports>
-      {imports.map{_.toXML}}
-    </imports>
+<imports>
+  {
+    imports.map{
+    _.toXML
+    }
+  }
+</imports>
   }
 
   def cacheFromXML(n:xml.Node): List[Import] = {
@@ -52,9 +56,8 @@ object Import {
 
   def acquireImport(imp: Import): Unit = {
     val url = s"https://github.com/${imp.ghUser}/${imp.name}/archive/${imp.branch}.zip"
-    val f = Util.download(url,downloadDirFile)
-    val dirFile = new File(s"~imports/${imp.ghUser}")
-    Util.unpackZip(f,dirFile)
+    val f = Util.download(url,downloadDirFile,Some(s"${imp.ghUser}-${imp.name}-${imp.branch}.zip"))
+    Util.unpackZip(f,new File(s"~imports/${imp.ghUser}"))
   }
 
   def importAll(f: File, importState: ImportState): ImportState = {
@@ -75,6 +78,7 @@ object Import {
                 saveCache(isc.cache)
                 importAll(imp.importFile, isc)
             }
+        case _ => is
       }
     }
   }
@@ -82,11 +86,11 @@ object Import {
 
 case class Import(name:String,ghUser:String,branch:String) {
   def toXML: xml.Node = {
-    <import>
-      <name>{name}</name>
-      <ghuser>{ghUser}</ghuser>
-      <branch>{branch}</branch>
-    </import>
+  <import>
+    <name>{name}</name>
+    <ghuser>{ghUser}</ghuser>
+    <branch>{branch}</branch>
+  </import>
   }
   def importFile: File = new File(s"~imports/$ghUser/$name-$branch/import.h")
   def dirFile: File = new File(s"~imports/$ghUser/$name-$branch")

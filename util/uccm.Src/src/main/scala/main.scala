@@ -210,11 +210,14 @@ object Prog {
     if ( !buildDir.exists ) buildDir.mkdirs()
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
+    val impDir = new File(incDir,"~")
     val targetElf = new File(buildDir,"firmware.elf")
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
     if ( cmdlOpts.targets.contains(Target.Rebuild) ) {
+      if ( impDir.exists )
+        impDir.listFiles(_.isDirectory).foreach{_.listFiles().foreach{_.delete()}}
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles.filter{_.isFile}.foreach{_.delete}
@@ -225,6 +228,7 @@ object Prog {
 
     if ( !objDir.exists ) objDir.mkdirs()
     if ( !incDir.exists ) incDir.mkdirs()
+    if ( !impDir.exists ) impDir.mkdirs()
 
     def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
       case Some(m) =>
@@ -467,10 +471,10 @@ object Prog {
         case Success(is) =>
           is.imports.foreach {
             imp => Try {
-              val userDir = new File(incDir, s"${imp.ghUser}")
+              val userDir = new File(impDir, s"${imp.ghUser}")
               if (!userDir.exists) userDir.mkdir()
               val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
-              val toWhere = new File(incDir, s"${imp.ghUser}/${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
+              val toWhere = new File(userDir, s"${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
               val cmdl = List("cmd", "/c", "mklink", "/J", Util.quote(toWhere), Util.quote(fromWhere)).mkString(" ")
               verbose(cmdl)
               cmdl.!
@@ -479,10 +483,11 @@ object Prog {
                 if ( ecode != 0 )
                   panic("could not create simbolic link to module")
               case Failure(e) =>
-                panic(e.getMessage)
+                BuildConsole.panicBt(e.getMessage,e.getStackTrace)
             }
           }
-        case Failure(e) => panic(e.getMessage)
+        case Failure(e) =>
+          BuildConsole.panicBt(e.getMessage,e.getStackTrace)
       }
 
     val buildScript =
