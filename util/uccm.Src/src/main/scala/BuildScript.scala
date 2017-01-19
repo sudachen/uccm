@@ -143,5 +143,8 @@ object BuildScript {
 
   lazy val uccmRepoDirectoryFile: File = new File(uccmRepoDirectory).getAbsoluteFile
 
+  lazy val uccmImportsRepoFile: File = new File("~imports")
+
+  var enableDevOpts: Boolean = true
 }
 

@@ -23,7 +23,8 @@ object Prog {
                          cflags:  List[String] = Nil,
                          softDevice: Option[String] = None,
                          newMain: Boolean = false,
-                         yes: Boolean = false)
+                         yes: Boolean = false,
+                         devOpts: Boolean = true)
 
   def main(argv: Array[String]): Unit = {
 
@@ -45,6 +46,10 @@ object Prog {
       opt[Unit]('y',"yes").
         action( (_,c) => c.copy(yes = true)).
         text("enable required actions like download and install software")
+
+      opt[Unit]("no-dev").
+        action( (_,c) => c.copy(devOpts = false)).
+        text("do not use development uccm version and disable local imports")
 
       opt[Unit]('n',"new-main").
         action( (_,c) => c.copy(newMain = true)).
@@ -167,6 +172,7 @@ object Prog {
 
     BuildConsole.useColors = cmdlOpts.color
     BuildConsole.beVerbose = cmdlOpts.verbose
+    BuildScript.enableDevOpts = cmdlOpts.devOpts
 
     val panic: String => Unit = BuildConsole.panic
     val info: String => Unit = BuildConsole.info
@@ -182,10 +188,10 @@ object Prog {
     if ( !mainFile.exists && !cmdlOpts.newMain )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
 
-    val mainPragmas = if (mainFile.exists) Pragmas.extractFrom(mainFile).toList else Nil
+    val mainPragmas = if (mainFile.exists) Pragma.extractFrom(mainFile).toList else Nil
     val targetBoard = cmdlOpts.board.getOrElse{ mainPragmas.foldLeft( Option[String](null) ) {
       ( dflts, prag ) => prag match {
-        case UccmDefault(tag,value) => tag match {
+        case Pragma.Default(tag,value) => tag match {
           case "board" => Some(value)
         }
         case _ => dflts
@@ -197,7 +203,7 @@ object Prog {
 
     val uccmHome = BuildScript.uccmDirectoryFile
 
-    val boardPragmas : List[UccmPragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) ++ mainPragmas match {
+    val boardPragmas : List[Pragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) ++ mainPragmas match {
       case Nil =>
         panic(s"unknown board $targetBoard"); Nil
       case lst => lst
@@ -252,7 +258,7 @@ object Prog {
 
     val aliases = boardPragmas.foldLeft( Map[String,String]("UCCM"->uccmHome.getCanonicalPath) ) {
       (aliases,prag) => prag match {
-        case UccmAlias(tag,path) => aliases + (tag -> (aliases.get(tag) match {
+        case Pragma.Alias(tag,path) => aliases + (tag -> (aliases.get(tag) match {
           case None => path
           case Some(s) =>
             panic("aliases can't be rewrited");s
@@ -313,7 +319,7 @@ object Prog {
     val softDeviceMap = boardPragmas.foldLeft(Map[String, String]()) {
       (vw, prag) =>
         prag match {
-          case UccmSoftDevice(tag, pathToHex) => vw + (tag -> pathToHex)
+          case Pragma.SoftDevice(tag, pathToHex) => vw + (tag -> pathToHex)
           case _ => vw
         }
     }
@@ -321,7 +327,7 @@ object Prog {
     val targetSoftDevice = boardPragmas.foldLeft(cmdlOpts.softDevice.getOrElse(
       boardPragmas.foldLeft( Option[String](null) ) {
         (df,prag) => prag match {
-          case UccmDefault("softdevice",tag) => Some(tag)
+          case Pragma.Default("softdevice",tag) => Some(tag)
           case _ => df
         }
       } match {
@@ -330,7 +336,7 @@ object Prog {
       })) {
         (n, prag) =>
           prag match {
-            case UccmSoftDeviceAls(`n`, alias) => alias
+            case Pragma.SoftDeviceAls(`n`, alias) => alias
             case _ => n
           }
         }
@@ -342,7 +348,7 @@ object Prog {
       case Some(cc) => cc
       case None => boardPragmas.foldLeft( Compiler.GCC ) {
         (cc, prag) => prag match {
-          case UccmDefault("compiler",value) => Compiler.fromString(value).get
+          case Pragma.Default("compiler",value) => Compiler.fromString(value).get
           case _ => cc
         }
       }
@@ -369,14 +375,14 @@ object Prog {
 
     val xcflags = boardPragmas.foldLeft( s"-I{UCCM}" :: cmdlOpts.cflags ) {
       (xcflags,prag) => prag match {
-        case UccmXcflags(`targetSoftDevice`,value) => value :: xcflags
-        case UccmXcflags("*",value) => value :: xcflags
-        case UccmXcflags(x,value) => Compiler.fromString(x) match {
+        case Pragma.Xcflags(`targetSoftDevice`,value) => value :: xcflags
+        case Pragma.Xcflags("*",value) => value :: xcflags
+        case Pragma.Xcflags(x,value) => Compiler.fromString(x) match {
           case Some(`targetCompiler`) => value :: xcflags
           case _ => xcflags
         }
-        case UccmBoard(`targetBoard`,value) => value :: xcflags
-        case UccmBoard("*",value) => value :: xcflags
+        case Pragma.Board(`targetBoard`,value) => value :: xcflags
+        case Pragma.Board("*",value) => value :: xcflags
         case _ => xcflags
       }
     }.map{expandAlias}.reverse
@@ -427,30 +433,30 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
-      Pragmas.extractFromTempFile(tempFile).foldLeft(
+      Pragma.extractFromTempFile(tempFile).foldLeft(
         BuildScript(targetBoard,targetCompiler,None,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
-          case UccmXcflags(`targetSoftDevice`,value) => bs.copy(cflags = value :: bs.cflags)
-          case UccmXcflags("*",value) => bs.copy(cflags = value :: bs.cflags)
-          case UccmXcflags(x,value) => Compiler.fromString(x) match {
+          case Pragma.Xcflags(`targetSoftDevice`,value) => bs.copy(cflags = value :: bs.cflags)
+          case Pragma.Xcflags("*",value) => bs.copy(cflags = value :: bs.cflags)
+          case Pragma.Xcflags(x,value) => Compiler.fromString(x) match {
             case Some(`targetCompiler`) => bs.copy(cflags = value :: bs.cflags)
             case _ => bs
           }
-          case UccmCflags(value) => bs.copy(cflags = value :: bs.cflags)
-          case UccmLdflags(value) => bs.copy(ldflags = value :: bs.ldflags)
-          case UccmAsflags(value) => bs.copy(asflags = value :: bs.asflags)
-          case UccmBoard(`targetBoard`,value) => bs.copy(cflags = value :: bs.cflags)
-          case UccmBoard("*",value) => bs.copy(cflags = value :: bs.cflags)
-          case UccmRequire("module",value) => bs.copy(modules = value :: bs.modules)
-          case UccmRequire("source",value) => bs.copy(sources = value :: bs.sources)
-          case UccmRequire("lib",value) => bs.copy(libraries = value :: bs.libraries)
-          case UccmRequire("begin",value) => bs.copy(begin = value :: bs.begin)
-          case UccmRequire("end",value) => bs.copy(end = value :: bs.end)
-          case UccmAppend(tag,value) => bs.copy(generated = (tag,value) :: bs.generated )
-          case UccmAppendEx(tag,value) => bs.copy(generated = (tag,expandAlias(value)) :: bs.generated )
-          case UccmDefault("debugger",value) => bs.copy( debugger = Debugger.fromString(value) )
+          case Pragma.Cflags(value) => bs.copy(cflags = value :: bs.cflags)
+          case Pragma.Ldflags(value) => bs.copy(ldflags = value :: bs.ldflags)
+          case Pragma.Asflags(value) => bs.copy(asflags = value :: bs.asflags)
+          case Pragma.Board(`targetBoard`,value) => bs.copy(cflags = value :: bs.cflags)
+          case Pragma.Board("*",value) => bs.copy(cflags = value :: bs.cflags)
+          case Pragma.Require("module",value) => bs.copy(modules = value :: bs.modules)
+          case Pragma.Require("source",value) => bs.copy(sources = value :: bs.sources)
+          case Pragma.Require("lib",value) => bs.copy(libraries = value :: bs.libraries)
+          case Pragma.Require("begin",value) => bs.copy(begin = value :: bs.begin)
+          case Pragma.Require("end",value) => bs.copy(end = value :: bs.end)
+          case Pragma.Append(tag,value) => bs.copy(generated = (tag,value) :: bs.generated )
+          case Pragma.AppendEx(tag,value) => bs.copy(generated = (tag,expandAlias(value)) :: bs.generated )
+          case Pragma.Default("debugger",value) => bs.copy( debugger = Debugger.fromString(value) )
           case _ => bs
         }
       } match {
@@ -471,7 +477,7 @@ object Prog {
     }
 
     if ( targets.contains(Target.Reconfig) )
-      Try { Import.importAll(mainFile,ImportState(Import.loadCache())) } match {
+      Try { Import.importAll(mainFile) } match {
         case Success(is) =>
           is.imports.foreach {
             imp => Try {
@@ -525,7 +531,7 @@ object Prog {
         val tag = Debugger.stringify(debugger)
         boardPragmas.foldLeft( List[String]() ) {
           (dbg, prag) => prag match {
-            case UccmDebugger(`tag`,opts) => opts :: dbg
+            case Pragma.Debugger(`tag`,opts) => opts :: dbg
             case _ => dbg
           }}
       case None => Nil
@@ -711,13 +717,13 @@ object Prog {
     System.exit(0)
   }
 
-  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[UccmPragma] = {
+  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[Pragma] = {
 
     val boardDir = new File(uccmHome,"uccm/board")
     val localBoardDir = new File(getCurrentDirectory,"board")
 
-    def f(s:Stream[File]) : Stream[List[UccmPragma]] =  s match {
-      case xs #:: t => Pragmas.extractFrom(xs).toList #:: f(t)
+    def f(s:Stream[File]) : Stream[List[Pragma]] =  s match {
+      case xs #:: t => Pragma.extractFrom(xs).toList #:: f(t)
       case _ => Stream.empty
     }
 
@@ -734,13 +740,13 @@ object Prog {
         Stream.empty
     } find {
         _.exists {
-          case UccmBoard(`targetBoard`,_) => true
+          case Pragma.Board(`targetBoard`,_) => true
           case _ => false
         }
     }
 
     if ( boardPragmas.nonEmpty )
-      Pragmas.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ boardPragmas.get
+      Pragma.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ boardPragmas.get
     else
       Nil
   }
