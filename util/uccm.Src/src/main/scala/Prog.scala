@@ -553,7 +553,7 @@ object Prog {
       val cc = Compiler.ccPath(targetCompiler)
       val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
       val where = local(buildDir.getPath)
-      val rx = ("("+where+"/inc/[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
+      val rx = ("("+where+"/inc/~?[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
       if ( depsFile.exists ) depsFile.delete()
       val wr = new FileWriter(depsFile, false)
       val pl = ProcessLogger(s =>

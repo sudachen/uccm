@@ -29,16 +29,16 @@ call "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" %*
 if %errorlevel% EQU 0 goto :eof
 exit 1
 
-:update_uccm
-java -jar %PROGNAME%
-if %errorlevel% EQU 0 goto :eof
-echo "failed to acquire uCcm build manager"
-exit 1
-
 :do_self_update
 if exist "%UCCM100REPO%\uccm-uccm100" rmdir /Q /S "%UCCM100REPO%\uccm-uccm100"
 call :update_uccm
 if %errorlevel% EQU 0 goto :eof
+exit 1
+
+:update_uccm
+java -jar %PROGNAME%
+if %errorlevel% EQU 0 goto :eof
+echo "failed to acquire uCcm build manager"
 exit 1
 
 :exec_dev_version
