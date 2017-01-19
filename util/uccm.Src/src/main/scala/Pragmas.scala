@@ -64,7 +64,7 @@ object Pragmas {
     val rInfo    = "#pragma\\s*uccm\\s*info\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rDownload= "#pragma\\s*uccm\\s*download\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rInclude = "^#include\\s*<(uccm/./././[\\/\\.\\-\\+\\w]+)>\\s*$".r
-    val rImport  = "^#include\\s*<~/(\\w+)/(\\w+)/import.h>\\s*$".r
+    val rImport  = "^#include\\s*<~(\\w+)/(\\w+)/import.h>\\s*$".r
 
     def ns(s:String) = {
       val ss = s.dropRight(s.length-s.lastIndexWhere {' '.!= }-1)

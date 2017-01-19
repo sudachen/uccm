@@ -6,25 +6,24 @@ import scala.util.{Failure, Success, Try}
 import sys.process._
 import scala.io.Source
 
-object Target extends Enumeration {
-  val Clean, Rebuild, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
-}
-
-case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
-                       targets:  Set[Target.Value] = Set(Target.Build),
-                       board:    Option[String] = None,
-                       compiler: Option[Compiler.Value] = None,
-                       debugger: Option[Debugger.Value] = None,
-                       mainFile: Option[File] = None,
-                       verbose:  Boolean = false,
-                       color:  Boolean = false,
-                       cflags:  List[String] = Nil,
-                       softDevice: Option[String] = None,
-                       newMain: Boolean = false,
-                       yes: Boolean = false
-                      )
-
 object Prog {
+
+  object Target extends Enumeration {
+    val Clean, Reconfig, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
+  }
+
+  case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
+                         targets:  Set[Target.Value] = Set(Target.Build),
+                         board:    Option[String] = None,
+                         compiler: Option[Compiler.Value] = None,
+                         debugger: Option[Debugger.Value] = None,
+                         mainFile: Option[File] = None,
+                         verbose:  Boolean = false,
+                         color:  Boolean = false,
+                         cflags:  List[String] = Nil,
+                         softDevice: Option[String] = None,
+                         newMain: Boolean = false,
+                         yes: Boolean = false)
 
   def main(argv: Array[String]): Unit = {
 
@@ -95,57 +94,61 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
         text("update project and start code editor")
 
+      opt[Unit]("reconfig").
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig - Target.Build)).
+        text("reconfigure only")
+
       opt[Unit]("rebuild").
-        action( (_,c) => c.copy(targets = c.targets + Target.Rebuild)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig)).
         text("reconfigure and do clean build")
 
       opt[Unit]("release").
         action( (_,c) => c.copy(buildConfig = BuildConfig.Release)).
-        text("[on rebuild] configure for release build (by default)")
+        text("[on rebuild/reconfig] configure for release build (by default)")
 
       opt[Unit]("debug").
         action( (_,c) => c.copy(buildConfig = BuildConfig.Debug)).
-        text("[on rebuild] configure for debug build")
+        text("[on rebuild/reconfig] configure for debug build")
 
       opt[String]('D',"define").
         action( (x,c) => c.copy(cflags = ("-D"+x)::c.cflags)).
-        text("[on rebuild] add macro definition to compiler cflags")
+        text("[on rebuild/reconfig] add macro definition to compiler cflags")
 
       opt[Unit]("gcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.GCC))).
-        text("[on rebuild] use ARM-NONE-EABI GNU C compiler")
+        text("[on rebuild/reconfig] use ARM-NONE-EABI GNU C compiler")
 
       opt[Unit]("armcc").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC))).
-        text("[on rebuild] use KeilV5 armcc compiler")
+        text("[on rebuild/reconfig] use KeilV5 armcc compiler")
 
       opt[Unit]("armcc-microlib").
         action( (_,c) => c.copy(compiler = Some(Compiler.ARMCC),cflags = "-DUSE_MICROLIB"::c.cflags)).
-        text("[on rebuild] use KeilV5 armcc compiler with C-microlib")
+        text("[on rebuild/reconfig] use KeilV5 armcc compiler with C-microlib")
 
       opt[Unit]("stlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.STLINK))).
-        text("[on rebuild] use STM ST-Link debugger/programmer")
+        text("[on rebuild/reconfig] use STM ST-Link debugger/programmer")
 
       opt[Unit]("jlink").
         action( (_,c) => c.copy(debugger = Some(Debugger.JLINK))).
-        text("[on rebuild] use SEGGER J-Link debugger/programmer")
+        text("[on rebuild/reconfig] use SEGGER J-Link debugger/programmer")
 
       opt[Unit]("nrfjprog").
         action( (_,c) => c.copy(debugger = Some(Debugger.NRFJPROG))).
-        text("[on rebuild] use Nordic nrfjprog tool (requires J-Link)")
+        text("[on rebuild/reconfig] use Nordic nrfjprog tool (requires J-Link)")
 
       opt[Unit]("raw").
         action( (_,c) => c.copy(softDevice = Some("RAW"))).
-        text("[on rebuild] use no softdevice")
+        text("[on rebuild/reconfig] use no softdevice")
 
       opt[Unit]("ble").
         action( (_,c) => c.copy(softDevice = Some("BLE"))).
-        text("[on rebuild] use BLE softdevice aka S130/S132")
+        text("[on rebuild/reconfig] use BLE softdevice aka S130/S132")
 
       opt[String]("softdevice").
         action( (x,c) => c.copy(softDevice = Some(x.toUpperCase))).
-        text("[on rebuild] use specific softdevice")
+        text("[on rebuild/reconfig] use specific softdevice")
 
       arg[File]("main.c").optional().
         action( (x,c) => c.copy(mainFile = Some(x))).
@@ -202,33 +205,37 @@ object Prog {
 
     info(s"uccm is working now for board $targetBoard")
 
-    val buildDir = new File(".",
-      s"~$targetBoard"
-    )
+    val buildDir = new File(".",s"~$targetBoard")
+    val buildScriptFile = new File(buildDir,"script.xml")
 
-    val prepareBuildDir = !buildDir.exists
+    val targets =
+      if (!buildDir.exists || !buildScriptFile.exists)
+        cmdlOpts.targets + Target.Reconfig
+      else
+        cmdlOpts.targets
+
     if ( !buildDir.exists ) buildDir.mkdirs()
+
     val objDir = new File(buildDir,"obj")
     val incDir = new File(buildDir,"inc")
-    val impDir = new File(incDir,"~")
     val targetElf = new File(buildDir,"firmware.elf")
     val targetHex = new File(buildDir,"firmware.hex")
     val targetBin = new File(buildDir,"firmware.bin")
     val targetAsm = new File(buildDir,"firmware.asm")
-    if ( cmdlOpts.targets.contains(Target.Rebuild) ) {
-      if ( impDir.exists )
-        impDir.listFiles(_.isDirectory).foreach{_.listFiles().foreach{_.delete()}}
+
+    if ( targets.contains(Target.Reconfig) ) {
+      if ( incDir.exists )
+        incDir.listFiles.filter(_.getName.startsWith("~")).foreach{_.listFiles().foreach{_.delete()}}
       FileUtils.deleteDirectory(objDir)
       FileUtils.deleteDirectory(incDir)
       buildDir.listFiles.filter{_.isFile}.foreach{_.delete}
-    } else if ( cmdlOpts.targets.contains(Target.Clean) ) {
+    } else if ( targets.contains(Target.Clean) ) {
       FileUtils.deleteDirectory(objDir)
       buildDir.listFiles.filter{ f => f.isFile && f.getName != "script.xml" }.foreach{_.delete}
     }
 
     if ( !objDir.exists ) objDir.mkdirs()
     if ( !incDir.exists ) incDir.mkdirs()
-    if ( !impDir.exists ) impDir.mkdirs()
 
     def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
       case Some(m) =>
@@ -350,7 +357,7 @@ object Prog {
       }
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte) || cmdlOpts.targets.contains(Target.QteStart) ) {
+    if ( targets.contains(Target.Qte) || targets.contains(Target.QteStart) ) {
       if ( QtProj.isRequiredToInstall )
         if (!cmdlOpts.yes)
           panic(s"looks like it's required to install QtCreator, restart with -y")
@@ -374,8 +381,7 @@ object Prog {
       }
     }.map{expandAlias}.reverse
 
-    val buildScriptFile = new File(buildDir,"script.xml")
-    if ( !buildScriptFile.exists || cmdlOpts.targets.contains(Target.Rebuild) )
+    if ( targets.contains(Target.Reconfig) )
       info(s"uccm is using ${Compiler.stringify(targetCompiler)} compiler")
 
     if ( !mainFile.exists ){
@@ -464,14 +470,12 @@ object Prog {
       }
     }
 
-    val buildScriptExists = buildScriptFile.exists
-
-    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
+    if ( targets.contains(Target.Reconfig) )
       Try { Import.importAll(mainFile,ImportState(Import.loadCache())) } match {
         case Success(is) =>
           is.imports.foreach {
             imp => Try {
-              val userDir = new File(impDir, s"${imp.ghUser}")
+              val userDir = new File(incDir, s"~${imp.ghUser}")
               if (!userDir.exists) userDir.mkdir()
               val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
               val toWhere = new File(userDir, s"${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
@@ -491,12 +495,12 @@ object Prog {
       }
 
     val buildScript =
-      if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) )
+      if ( targets.contains(Target.Reconfig) )
         extractFromPreprocessor
       else
         BuildScript.fromXML(scala.xml.XML.loadFile(buildScriptFile))
 
-    if ( !buildScriptExists || cmdlOpts.targets.contains(Target.Rebuild) ) {
+    if ( targets.contains(Target.Reconfig) ) {
       scala.xml.XML.save(buildScriptFile.getCanonicalPath, buildScript.toXML)
     } else {
       info(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
@@ -527,7 +531,7 @@ object Prog {
       case None => Nil
     }
 
-    if ( cmdlOpts.targets.contains(Target.Rebuild) || prepareBuildDir )
+    if ( targets.contains(Target.Reconfig) )
       buildScript.generated.foreach {
         case ( fname, content ) =>
           val text = content.replace("\\n","\n").replace("\\t","\t")
@@ -558,7 +562,7 @@ object Prog {
       wr.close()
     }
 
-    if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+    if ( targets.contains(Target.Reconfig) ||
       !depsFile.exists ||
       FileUtils.isFileOlder(depsFile,mainFile) )
       mkdeps()
@@ -569,7 +573,7 @@ object Prog {
       val srcFile = new File(source)
       val objFileName = srcFile.getName + ".obj"
       val objFile = new File(objDir,objFileName)
-      if ( cmdlOpts.targets.contains(Target.Rebuild) ||
+      if ( targets.contains(Target.Reconfig) ||
         !objFile.exists || FileUtils.isFileOlder(objFile,srcFile) ||
         ( lt != 0  && objFile.lastModified() < lt ) ) {
         info(s"compiling ${srcFile.getName} ...")
@@ -589,10 +593,10 @@ object Prog {
       objFile.getName :: ls
     }
 
-    if ( cmdlOpts.targets.contains(Target.Qte)  )
+    if ( targets.contains(Target.Qte)  )
       QtProj.generate(mainFile,buildScript,buildDir,expandHome)
 
-    if ( cmdlOpts.targets.contains(Target.Build) ) {
+    if ( targets.contains(Target.Build) ) {
 
       val deps = {
         val f = Source.fromFile(depsFile)
@@ -614,7 +618,7 @@ object Prog {
       val ld = Compiler.ldPath(buildScript.ccTool)
       val objFiles = (objects ++ modules).map { fn => new File(objDir, fn) }
 
-      val haveToRelink = cmdlOpts.targets.contains(Target.Rebuild) ||
+      val haveToRelink = targets.contains(Target.Reconfig) ||
         !targetElf.exists ||
         objFiles.foldLeft(false) { (f, obj) => f || FileUtils.isFileOlder(targetElf, obj) }
 
@@ -641,17 +645,17 @@ object Prog {
         }
       }
 
-      if (cmdlOpts.targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
+      if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
         if (targetDebugger.isEmpty)
           panic("debuger is not defined")
         else {
           val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
 
-          val targets =
-            if (cmdlOpts.targets(Target.Program) && cmdlOpts.targets(Target.Reset))
-              cmdlOpts.targets - Target.Reset
+          val targetsSet =
+            if (targets(Target.Program) && targets(Target.Reset))
+              targets - Target.Reset
             else
-              cmdlOpts.targets
+              targets
 
           lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
             case "RAW" => None
@@ -667,14 +671,14 @@ object Prog {
           }
 
           targetsOrder.filter {
-            targets(_)
+            targetsSet(_)
           } foreach { t =>
             (t match {
               case Target.Erase =>
                 Debugger.erase(buildScript.debugger.get, dbgConnect)
               case Target.Program =>
                 Debugger.program(buildScript.debugger.get, targetHex,
-                  cmdlOpts.targets.contains(Target.Reset), dbgConnect)
+                  targets.contains(Target.Reset), dbgConnect)
               case Target.Reset =>
                 Debugger.reset(buildScript.debugger.get, dbgConnect)
               case Target.Connect =>
@@ -692,7 +696,7 @@ object Prog {
 
     info("succeeded")
 
-    if ( cmdlOpts.targets.contains(Target.QteStart) ) Try {
+    if ( targets.contains(Target.QteStart) ) Try {
       val project = Util.quote(new File(buildScript.boardName).getAbsolutePath + ".creator")
       val settings = Util.quote(QtProj.qteSettingsFile.getAbsolutePath)
       val mainC = Util.quote(mainFile.getPath)

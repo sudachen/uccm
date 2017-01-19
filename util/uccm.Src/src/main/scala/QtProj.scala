@@ -298,7 +298,7 @@ object QtProj {
         <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.1">
           <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
             <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --rebuild -j</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --reconfig -j</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>
