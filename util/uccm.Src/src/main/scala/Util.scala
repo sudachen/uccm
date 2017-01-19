@@ -6,7 +6,6 @@ import java.net.{HttpURLConnection, URL}
 import java.util.zip.ZipFile
 
 import scala.io.BufferedSource
-import scala.util.Try
 import scala.collection.JavaConverters._
 
 object Util {
