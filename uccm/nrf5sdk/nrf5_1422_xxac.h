@@ -8,6 +8,8 @@
 #define NRF51
 #endif
 
+#define __nRF5x_UC__ 0x51422ac0
+
 #include "nrf5_1.h"
 
 #ifdef __keil_v5

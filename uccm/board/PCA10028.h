@@ -19,6 +19,7 @@
 #include "../LED.h"
 #include "../button.h"
 
+__Inline
 void ucSetup_Board()
 {
     ucSetup_BoardLEDs();

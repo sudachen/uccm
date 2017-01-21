@@ -43,10 +43,14 @@
 #endif
 #define __Static_Assert(Expr) __Static_Assert_S(Expr,#Expr)
 
-#define __Assert(x) (void)0
+#define __Assert_S(x,Text) (void)0
+#define __Assert(x) __Assert_S(x,#x)
+#define __Unreachable() __Assert_S(0,"unreachable code")
 
 #define ucSet_Bits(Where, Bits)   ((Where) |= (Bits))
 #define ucClear_Bits(Where, Bits) ((Where) &= ~(Bits))
 #define ucGet_Bits(Where, Bits)   ((Where) & (Bits))
 #define ucSet_Value(Where, Mask, Bits) ((Where) = (((Where) & (~(Mask))) | (Bits)))
 
+
+#define __Do_Not_Remove __attribute__((used))
