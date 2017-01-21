@@ -12,7 +12,7 @@ public class GetUccm {
     public static void main(String[] argv) {
         try {
 
-            URL uccm100Url = new URL("https://github.com/alexeysudachen/uccm/archive/uccm100.zip");
+            URL uccm100Url = new URL("https://github.com/sudachen/uccm/archive/uccm100.zip");
 
             System.out.println("it uses source "+uccm100Url.toString());
 
