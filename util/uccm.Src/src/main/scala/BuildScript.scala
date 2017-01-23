@@ -30,7 +30,11 @@ case class BuildScript(boardName:String,
                        end:List[String] = Nil,
                        ldflags:List[String] = Nil,
                        asflags:List[String] = Nil,
-                       softDevice:String = "RAW") {
+                       softDevice:String = "RAW",
+                       jRttViewOpt:List[String] = Nil,
+                       debuggerOpt:List[String] = Nil,
+                       lets:Map[String,String] = Map(),
+                       generatedPart:List[(String,BuildScript=>String)] = Nil) {
   def toXML : scala.xml.Node = {
     <uccm>
       <board>

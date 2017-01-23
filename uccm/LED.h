@@ -38,7 +38,7 @@ C_MAP(ONE_LEDTOGGLE,C_SPACE,UCCM_BOARD_LEDS)
 __Inline
 void ucSetup_BoardLEDs()
 {
-#define SETUP_ONE_LED(x,y) ucSetup_OutputLeg(C_GETITEM_1 x,C_GETITEM_2 x);
+#define SETUP_ONE_LED(x,y) ucSetup_OutputLeg(C_GETITEM_1 x,C_GETITEM_2 x); ucSet_Leg((C_GETITEM_1 x),((C_GETITEM_2 x)!=LEG_OPEN_DRAIN)?0:1);
     C_MAP(SETUP_ONE_LED,C_SEMICOLON,UCCM_BOARD_LEDS);
 #undef SETUP_ONE_LED
 }

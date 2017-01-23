@@ -190,4 +190,15 @@ object Debugger extends Enumeration {
     case JLINK => Components.dflt.acquireComponent("jlink")
     case STLINK => Components.dflt.acquireComponent("stlink")
   }
+
+  def softPakName(kind: Value): String = kind match {
+    case NRFJPROG => "Nordic J-Prog utility"
+    case JLINK => "SEGGER J-Link utility"
+    case STLINK => "STM32 ST-LINK utility"
+  }
+
+  def jRttView(opt: List[String]) : Try[Unit] = Try {
+
+  }
+
 }

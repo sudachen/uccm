@@ -9,7 +9,7 @@ import scala.io.Source
 object Prog {
 
   object Target extends Enumeration {
-    val Clean, Reconfig, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
+    val Clean, Reconfig, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart, RttView = Value
   }
 
   case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
@@ -98,6 +98,10 @@ object Prog {
       opt[Unit]("edit").
         action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
         text("update project and start code editor")
+
+      opt[Unit]("rtt-view").
+        action( (_,c) => c.copy(targets = c.targets + Target.RttView - Target.Build)).
+        text("start SEGGER jLinkRTTView terminal connected to uC")
 
       opt[Unit]("reconfig").
         action( (_,c) => c.copy(targets = c.targets + Target.Reconfig - Target.Build)).
@@ -393,6 +397,7 @@ object Prog {
     if ( !mainFile.exists ){
       val wr = new PrintWriter(mainFile)
       wr.println(s"#pragma uccm default(board)= $targetBoard")
+      wr.println("#pragma uccm let(HEAP_SIZE)= 0")
       if ( cmdlOpts.softDevice.isDefined)
         wr.println(s"#pragma uccm default(softdevice)= ${cmdlOpts.softDevice.isDefined}")
       if ( cmdlOpts.compiler.isDefined )
@@ -409,6 +414,35 @@ object Prog {
       wr.println("    for(;;) __NOP();")
       wr.println("}")
       wr.close()
+    }
+
+    val targetDebugger =
+      if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger
+      else boardPragmas.foldLeft( Option.empty[Debugger.Value] ) {
+        (opt,prag) => prag match {
+          case Pragma.Default("debugger",name) => Debugger.fromString(name)
+          case _ => opt
+        }
+      }
+
+    if ( targetDebugger.isDefined ) {
+      info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
+      if ( Debugger.isRequiredToInstallSoftware(targetDebugger.get) ) {
+        if ( !cmdlOpts.yes )
+          panic(s"looks like required to download and install ${Debugger.softPakName(targetDebugger.get)}, restart with -y")
+        else if ( !Debugger.install(targetDebugger.get) )
+          panic(s"failed to install ${Debugger.stringify(targetDebugger.get)}")
+      }
+    } else
+      info(s"uccm is not using any debugger")
+
+    if ( targets.contains(Target.RttView) ) {
+      if ( Debugger.isRequiredToInstallSoftware(Debugger.JLINK) ) {
+        if ( !cmdlOpts.yes )
+          panic(s"looks like required to download and install SEGGER j-Link utilities, restart with -y")
+        else if (!Debugger.install(Debugger.JLINK))
+          panic("failed to install SEGGER j-Link utilities")
+      }
     }
 
     def extractFromPreprocessor : BuildScript = {
@@ -433,8 +467,23 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
+      def expandVar(lets: Map[String,String])(s: String): String = "(\\{\\$([\\w]+)\\})".r findFirstMatchIn s match {
+        case None => s
+        case Some(m) => lets.get(m.group(2)) match {
+          case None =>
+            panic(s"unknown var '${m.group(2)}' is used");s
+          case Some(value) =>
+            expandVar(lets)(s.replace(m.group(1),value))
+        }
+      }
+
+      val debuggerTag = targetDebugger match {
+        case Some(kind) => Debugger.stringify(kind)
+        case None => ";"
+      }
+
       Pragma.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetBoard,targetCompiler,None,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,targetCompiler,targetDebugger,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
@@ -454,24 +503,30 @@ object Prog {
           case Pragma.Require("lib",value) => bs.copy(libraries = value :: bs.libraries)
           case Pragma.Require("begin",value) => bs.copy(begin = value :: bs.begin)
           case Pragma.Require("end",value) => bs.copy(end = value :: bs.end)
-          case Pragma.Append(tag,value) => bs.copy(generated = (tag,value) :: bs.generated )
-          case Pragma.AppendEx(tag,value) => bs.copy(generated = (tag,expandAlias(value)) :: bs.generated )
-          case Pragma.Default("debugger",value) => bs.copy( debugger = Debugger.fromString(value) )
+          case Pragma.Append(tag,value) => bs.copy(generatedPart = (tag, (x:BuildScript) => value) :: bs.generatedPart )
+          case Pragma.AppendEx(tag,value) => bs.copy(generatedPart = (tag, (x:BuildScript) => expandVar(x.lets)(expandAlias(value))) :: bs.generatedPart )
+          case Pragma.Let(name,value) => bs.copy(lets = bs.lets + (name -> value) )
+          case Pragma.LetIfNo(name,value) => if ( bs.lets.contains(name) ) bs else bs.copy(lets = bs.lets + (name -> value) )
+          case Pragma.Debugger(`debuggerTag`,opt) => bs.copy(debuggerOpt = opt :: bs.debuggerOpt)
+          case Pragma.Debugger("jrttview",opt) => bs.copy(jRttViewOpt = opt :: bs.jRttViewOpt)
           case _ => bs
         }
       } match {
-        case bs => bs.copy(
+        case bs => println(bs.lets); bs.copy(
           softDevice = targetSoftDevice,
-          generated = bs.generated.reverse,
-          cflags = bs.cflags.map{expandAlias}.reverse,
-          ldflags = bs.ldflags.map{expandAlias}.reverse,
-          asflags = bs.asflags.map{expandAlias}.reverse,
-          sources = bs.begin.map{expandAlias}.reverse ++
-                    bs.sources.map{expandAlias}.reverse ++
-                    bs.end.map{expandAlias},
-          modules = bs.modules.map{expandAlias}.reverse,
-          libraries = bs.libraries.map{expandAlias}.reverse,
-          debugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else bs.debugger
+          generated = bs.generatedPart.map{t => (t._1,t._2(bs))}.reverse,
+          cflags = bs.cflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          ldflags = bs.ldflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          asflags = bs.asflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)},
+          modules = bs.modules.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          libraries = bs.libraries.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          debuggerOpt = bs.debuggerOpt.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          jRttViewOpt = bs.jRttViewOpt.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
+          generatedPart = Nil,
+          begin = Nil,
+          end = Nil,
+          lets = Map()
         )
       }
     }
@@ -513,29 +568,6 @@ object Prog {
     }
 
     info(s"uccm is using softdevice ${buildScript.softDevice}")
-
-    val targetDebugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else buildScript.debugger
-    if ( targetDebugger.isDefined ) {
-      info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
-      if ( Debugger.isRequiredToInstallSoftware(targetDebugger.get) ) {
-        if ( cmdlOpts.yes )
-          Debugger.install(targetDebugger.get)
-        else
-          panic(s"looks like required to download and install ${Debugger.stringify(targetDebugger.get)} component, restart with -y")
-      }
-    } else
-      info(s"uccm is not using any debugger")
-
-    val dbgConnect:List[String] = targetDebugger match {
-      case Some(debugger) =>
-        val tag = Debugger.stringify(debugger)
-        boardPragmas.foldLeft( List[String]() ) {
-          (dbg, prag) => prag match {
-            case Pragma.Debugger(`tag`,opts) => opts :: dbg
-            case _ => dbg
-          }}
-      case None => Nil
-    }
 
     if ( targets.contains(Target.Reconfig) )
       buildScript.generated.foreach {
@@ -681,16 +713,16 @@ object Prog {
           } foreach { t =>
             (t match {
               case Target.Erase =>
-                Debugger.erase(buildScript.debugger.get, dbgConnect)
+                Debugger.erase(buildScript.debugger.get, buildScript.debuggerOpt)
               case Target.Program =>
                 Debugger.program(buildScript.debugger.get, targetHex,
-                  targets.contains(Target.Reset), dbgConnect)
+                  targets.contains(Target.Reset), buildScript.debuggerOpt)
               case Target.Reset =>
-                Debugger.reset(buildScript.debugger.get, dbgConnect)
+                Debugger.reset(buildScript.debugger.get, buildScript.debuggerOpt)
               case Target.Connect =>
-                Debugger.connect(buildScript.debugger.get, dbgConnect)
+                Debugger.connect(buildScript.debugger.get, buildScript.debuggerOpt)
               case Target.Softdevice =>
-                Debugger.programSoftDevice(buildScript.debugger.get, dbgConnect, softDeviceHex)
+                Debugger.programSoftDevice(buildScript.debugger.get, buildScript.debuggerOpt, softDeviceHex)
             }) match {
               case Failure(f) =>
                 panic(f.getMessage)
@@ -712,6 +744,13 @@ object Prog {
     } match {
       case Success(_) => info("wait a little, code editor is starting ...")
       case Failure(e) => BuildConsole.error(e.getMessage)
+    }
+
+    if ( targets.contains(Target.RttView) ) {
+      Debugger.jRttView(buildScript.jRttViewOpt) match {
+        case Success(_) => info("wait a little, SEGGER JLinkRTTView is starting ...")
+        case Failure(e) => BuildConsole.error(e.getMessage)
+      }
     }
 
     System.exit(0)
