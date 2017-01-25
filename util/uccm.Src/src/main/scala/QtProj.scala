@@ -118,7 +118,7 @@ object QtProj {
     } else Some(st)) match {
       case None => false
       case Some(nst) =>
-        val rx = ".*\\[\\/](\\w+).xml$".r
+        val rx = ".*[\\/](\\w+).xml$".r
         val patRepo = "%UCCM100REPO%"
         val repoPath = BuildScript.uccmRepoDirectory.map{ case '\\' => '/' case x => x }
         val patUccm = "%UCCM100HOME%"
@@ -131,7 +131,7 @@ object QtProj {
             s.substring(0,n) + repoPath + expand(tail)
           case _ => s.indexOf(uccmPath) match {
             case n if n >= 0 =>
-              val tail = s.substring(n+patRepo.length)
+              val tail = s.substring(n+patUccm.length)
               s.substring(0,n) + uccmPath + expand(tail)
             case _ => s
           }
@@ -139,6 +139,7 @@ object QtProj {
 
         def p(n:String) : Option[String => String] = n match {
           case rx(s) =>
+            println(s)
             Some( t => expand(t) )
           case _ => None
         }

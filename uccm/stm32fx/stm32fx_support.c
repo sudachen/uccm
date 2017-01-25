@@ -108,7 +108,7 @@ GPIO_TypeDef * const ucConst_GPIO_TABLE[] =
 {
     GPIOA,GPIOB,UC_GPIOC,UC_GPIOD,UC_GPIOE,UC_GPIOF
 #ifdef _DEBUG
-    0,0,0,0,0,0,0,0,0,0
+    ,0,0,0,0,0,0,0,0,0,0
 #endif
 };
 

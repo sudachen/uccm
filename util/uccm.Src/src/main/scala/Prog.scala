@@ -20,7 +20,7 @@ object Prog {
     = Value
   }
 
-  case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
+  case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Debug,
                          targets:  Set[Target.Value] = Set(),
                          board:    Option[String] = None,
                          compiler: Option[Compiler.Value] = None,
@@ -107,6 +107,10 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
         text("update project and start code editor")
 
+      //opt[Unit]("debug").
+      //  action( (_,c) => c.copy()).
+      //  text("connect debugger to uC, may be used with --reset")
+
       opt[Unit]("rtt-view").
         action( (_,c) => c.copy(targets = c.targets + Target.RttView)).
         text("start SEGGER jLinkRTTView terminal connected to uC")
@@ -123,13 +127,9 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Reconfig + Target.Build)).
         text("reconfigure and do clean build")
 
-      opt[Unit]("release").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Release)).
-        text("[on rebuild/reconfig] configure for release build (by default)")
-
-      opt[Unit]("debug").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Debug)).
-        text("[on rebuild/reconfig] configure for debug build")
+      opt[Unit]("final").
+        action( (x,c) => c.copy(buildConfig = BuildConfig.Release) ).
+        text("[on rebuild/reconfig] configure for release build")
 
       opt[String]('D',"define").
         action( (x,c) => c.copy(cflags = ("-D"+x)::c.cflags)).
@@ -212,6 +212,7 @@ object Prog {
     val panic: String => Unit = BuildConsole.panic
     val info: String => Unit = BuildConsole.info
     val verbose: String => Unit = BuildConsole.verbose
+    val verboseInfo: String => Unit = BuildConsole.verboseInfo
 
     val mainFile :File = cmdlOpts.mainFile match {
       case Some(f) => new File(f.getName)
@@ -464,7 +465,7 @@ object Prog {
       wr.close()
     }
 
-    val targetDebugger =
+    val preTargetDebugger =
       if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger
       else boardPragmas.foldLeft( Option.empty[Debugger.Value] ) {
         (opt,prag) => prag match {
@@ -473,16 +474,18 @@ object Prog {
         }
       }
 
-    if ( targetDebugger.isDefined ) {
-      info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
-      if ( Debugger.isRequiredToInstallSoftware(targetDebugger.get) ) {
-        if ( !cmdlOpts.yes )
-          panic(s"looks like required to download and install ${Debugger.softPakName(targetDebugger.get)}, restart with -y")
-        else if ( !Debugger.install(targetDebugger.get) )
-          panic(s"failed to install ${Debugger.stringify(targetDebugger.get)}")
-      }
-    } else
-      info(s"uccm is not using any debugger")
+    if ( targets.contains(Target.Reconfig) ) {
+      if (preTargetDebugger.isDefined) {
+        info(s"uccm is using ${Debugger.stringify(preTargetDebugger.get)} programmer")
+        if (Debugger.isRequiredToInstallSoftware(preTargetDebugger.get)) {
+          if (!cmdlOpts.yes)
+            panic(s"looks like required to download and install ${Debugger.softPakName(preTargetDebugger.get)}, restart with -y")
+          else if (!Debugger.install(preTargetDebugger.get))
+            panic(s"failed to install ${Debugger.stringify(preTargetDebugger.get)}")
+        }
+      } else
+        info(s"uccm is not using any programmer")
+    }
 
     if ( targets.contains(Target.RttView) ) {
       if ( Debugger.isRequiredToInstallSoftware(Debugger.JLINK) ) {
@@ -525,13 +528,13 @@ object Prog {
         }
       }
 
-      val debuggerTag = targetDebugger match {
+      val debuggerTag = preTargetDebugger match {
         case Some(kind) => Debugger.stringify(kind)
         case None => ";"
       }
 
       Pragma.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetBoard,targetCompiler,targetDebugger,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,targetCompiler,preTargetDebugger,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
@@ -633,20 +636,42 @@ object Prog {
       else
         BuildScript.fromXML(scala.xml.XML.loadFile(buildScriptFile))
 
+    val targetDebugger = buildScript.debugger
+
     if ( targets.contains(Target.Reconfig) ) {
+
       scala.xml.XML.save(buildScriptFile.getCanonicalPath, buildScript.toXML)
+
     } else {
+
       info(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
+      if ( !targets.contains(Target.Reconfig) ) {
+        if (targetDebugger.isDefined)
+          info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} programmer")
+        else
+          info(s"uccm is not using any programmer")
+      }
+
     }
 
-    info(s"uccm is using softdevice ${buildScript.softDevice}")
+    if ( buildScript.softDevice.toUpperCase == "RAW" )
+      info(s"uccm is not using any softdevice")
+    else
+      info(s"uccm is using softdevice ${buildScript.softDevice}")
 
-    if ( targets.contains(Target.Reconfig) )
-      buildScript.lets.foreach { case (name, value) => verbose(s"$name => $value") }
+    info(s"uccm is configured for ${BuildConfig.stringify(buildScript.config)}")
+
+    if ( targets.contains(Target.Reconfig) ) {
+      info("using next values:")
+      buildScript.lets.foreach {
+        case (name, value) => info(s"  $name => $value")
+      }
+    }
 
     if ( targets.contains(Target.Reconfig) )
       buildScript.copyfile.foreach {
         case ( _, cpf ) =>
+          info("copying with edit to "+cpf.to)
           def repl(s:String) = cpf.replace.foldLeft(s) { (s,r) => r(s,buildScript.lets) }
           Try{ Util.copyFileToDir(incDir, expandAlias(cpf.from), cpf.to, repl) } match {
             case Success(_) =>
@@ -654,14 +679,17 @@ object Prog {
           }
       }
 
-    if ( targets.contains(Target.Reconfig) )
-      buildScript.generated.foreach {
-        case ( fname, content ) =>
-          val text = content.replace("\\n","\n").replace("\\t","\t")
-          val wr = new FileWriter(new File(incDir,fname),true)
-          wr.write(text)
+    if ( targets.contains(Target.Reconfig) ) {
+      buildScript.generated.foldRight(Map[String,List[String]]()) {
+        (t,m) => t match { case (name, content) => m + (name -> (content :: m.getOrElse(name,Nil))) }
+      }.foreach {
+        case (fname, content) =>
+          info("generating "+fname)
+          val wr = new FileWriter(new File(incDir, fname), true)
+          content.foreach { s => wr.write(s.replace("\\n", "\n").replace("\\t", "\t")) }
           wr.close()
       }
+    }
 
     val depsFile = new File(buildDir,"depends.txt")
     def mkdeps() = {
@@ -672,6 +700,7 @@ object Prog {
       val where = local(buildDir.getPath)
       val rx = ("("+where+"/inc/~?[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
       if ( depsFile.exists ) depsFile.delete()
+      info(s"resolving headers dependensies on ${mainFile.getName}")
       val wr = new FileWriter(depsFile, false)
       val pl = ProcessLogger(s =>
         rx.findAllMatchIn(rightSlash(s)).foreach {
@@ -771,7 +800,7 @@ object Prog {
 
     if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
       if (targetDebugger.isEmpty)
-        panic("debuger is not defined")
+        panic("programmer is not defined")
       else {
         val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
 

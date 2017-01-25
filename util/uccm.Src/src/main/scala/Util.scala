@@ -42,7 +42,7 @@ object Util {
 
                 val bs = new BufferedSource(is)
                 val pw = new PrintWriter(os)
-                bs.getLines().foreach { s => pw.println(p(s)) }
+                try bs.getLines().foreach { s => pw.println(p(s)) } finally pw.flush()
 
               case None =>
 

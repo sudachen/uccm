@@ -119,7 +119,12 @@ extern void uccm$printCstr(UcFormatOpt *opt,UcFormatParam *param);
 extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 #define $p(val) { .v = {.ptr = (val)}, .print = uccm$printPtr }
 
+#if defined _DEBUG || defined _FORCE_PRINT
 #define ucPrint(...) ucPrintF_Var(1,0,__VA_ARGS__,NIL)
+#else
+#define ucPrint(...) (void)0
+#endif
+
 #define ucError(...) ucPrintF_Var(1,1,__VA_ARGS__,NIL)
 
 #define ucPrintF_Var(nL,Wt,Fmt,...) \
@@ -127,7 +132,5 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
         UcFormatParam params[] = {C_MAP(C_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
         ucPrintF(sizeof(params)/sizeof(params[0]),(Fmt),(nL?1:0)|(Wt?2:0),params); \
     } while(0)
-
-#define UC_TRACE(...) ucPrint(__VA_ARGS__)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);
