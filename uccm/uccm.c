@@ -29,7 +29,7 @@ bool uccm$criticalExit(bool nested)
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     sd_nvic_critical_region_exit(nested);
 #else
-    if ( !netsed ) __enable_irq();
+    if ( !nested ) __enable_irq();
 #endif
 }
 

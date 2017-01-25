@@ -18,7 +18,8 @@ set PROGNAME=%~nx0
 if "%UCCM100REPO%"=="" set UCCM100REPO=%LOCALAPPDATA%\uCcm100Repo
 
 for %%i in (%*) do if %%i == --self-update goto :do_self_update
-for %%i in (%*) do if %%i == --no-dev goto :exec_no_dev
+for %%i in (%*) do if %%i == --no-dev set UCCM100DEV=
+for %%i in (%*) do if %%i == --jlink-stlink goto :exec_jlink_stlink
 
 if not "%UCCM100DEV%" == "" goto :exec_dev_version
 
@@ -47,7 +48,23 @@ call %UCCM100DEV%\uccm100.cmd %*
 if %errorlevel% EQU 0 goto :eof
 exit 1
 
+:exec_jlink_stlink
+set UCCM100DIR=%UCCM100REPO%\uccm-uccm100
+if not "%UCCM100DEV%" == "" set UCCM100DIR=%UCCM100DEV%
+call "%UCCM100DIR%\uccm100.cmd" %*
+if %errorlevel% NEQ 3 exit 1
+"%UCCM100REPO%\jstlink-612\STLinkReflash.exe"
+
 goto :eof
+
+rem
+rem
+rem
+rem
+rem
+rem
+rem
+rem
 rem
 rem
 rem

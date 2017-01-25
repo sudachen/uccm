@@ -1,7 +1,7 @@
 
 package com.sudachen.uccm
 
-import java.io.{File, FileOutputStream, FileWriter, PrintWriter}
+import java.io._
 import java.net.{HttpURLConnection, URL}
 import java.util.zip.ZipFile
 
@@ -128,6 +128,20 @@ object Util {
       }
     }
     dst
+  }
+
+  def copyFileToDir(dirFile:File, from:String,to:String,replace:String=>String): Unit = {
+
+    val is = io.Source.fromFile(from)
+    try {
+      val os = new FileWriter(new File(dirFile, to))
+      try
+        is.getLines().foreach {
+          s => os.write(replace(s)+"\n")
+        }
+      finally os.close()
+    } finally is.close()
+
   }
 
 }

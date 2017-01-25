@@ -17,6 +17,7 @@ object BuildConfig extends Enumeration {
   }
 }
 
+case class FileCopy(to:String,from:String,replace:List[(String,Map[String,String])=>String]=Nil)
 case class BuildScript(boardName:String,
                        ccTool:Compiler.Value,
                        debugger:Option[Debugger.Value],
@@ -34,76 +35,79 @@ case class BuildScript(boardName:String,
                        jRttViewOpt:List[String] = Nil,
                        debuggerOpt:List[String] = Nil,
                        lets:Map[String,String] = Map(),
-                       generatedPart:List[(String,BuildScript=>String)] = Nil) {
+                       generatedPart:List[(String,Map[String,String]=>String)] = Nil,
+                       copyfile:Map[String,FileCopy] = Map()) {
   def toXML : scala.xml.Node = {
-    <uccm>
-      <board>
-        {boardName}
-      </board>
-      <cctool>
-        {Compiler.stringify(ccTool)}
-      </cctool>
-      <debugger>
-        {debugger match { case Some(tag) => Debugger.stringify(tag) case None => ""}}
-      </debugger>
-      <softdevice>
-        {softDevice}
-      </softdevice>
-      <config>
-        {BuildConfig.stringify(config)}
-      </config>
-      <cflags>
-        {cflags map { i =>
-        <flag>
-          {i}
-        </flag>} }
-      </cflags>
-      <ldflags>
-        {ldflags map { i =>
-        <flag>
-          {i}
-        </flag>} }
-      </ldflags>
-      <asflags>
-        {asflags map { i =>
-        <flag>
-          {i}
-        </flag>} }
-      </asflags>
-      <sources>
-        {sources map { i =>
-        <file>
-          {i}
-        </file>} }
-      </sources>
-      <modules>
-        {modules map { i =>
-        <file>
-          {i}
-        </file>} }
-      </modules>
-      <libraries>
-        {libraries map { i =>
-        <file>
-          {i}
-        </file>} }
-      </libraries>
-      <generated>
-        {generated map { i =>
-        <append>
-          <file>
-            {i._1}
-          </file>
-          <content>
-            {scala.xml.PCData(i._2)}
-          </content>
-        </append>} }
-      </generated>
-    </uccm>
+<uccm>
+  <board>
+    {boardName}
+  </board>
+  <cctool>
+    {Compiler.stringify(ccTool)}
+  </cctool>
+  <debugger>
+    {debugger match { case Some(tag) => Debugger.stringify(tag) case None => ""}}
+  </debugger>
+  <debuggeropt>
+    {debuggerOpt map { i =>
+    <opt>
+      {i}
+    </opt>}}
+  </debuggeropt>
+  <jrttview>
+    {jRttViewOpt map { i =>
+    <opt>
+      {i}
+    </opt>}}
+  </jrttview>
+  <softdevice>
+    {softDevice}
+  </softdevice>
+  <config>
+    {BuildConfig.stringify(config)}
+  </config>
+  <cflags>
+    {cflags map { i =>
+    <flag>
+      {i}
+    </flag>} }
+  </cflags>
+  <ldflags>
+    {ldflags map { i =>
+    <flag>
+      {i}
+    </flag>} }
+  </ldflags>
+  <asflags>
+    {asflags map { i =>
+    <flag>
+      {i}
+    </flag>} }
+  </asflags>
+  <sources>
+    {sources map { i =>
+    <file>
+      {i}
+    </file>} }
+  </sources>
+  <modules>
+    {modules map { i =>
+    <file>
+      {i}
+    </file>} }
+  </modules>
+  <libraries>
+    {libraries map { i =>
+    <file>
+      {i}
+    </file>} }
+  </libraries>
+</uccm>
   }
 }
 
 object BuildScript {
+
   def fromXML(xml: scala.xml.Node) : BuildScript = {
     def bs(c:Char):Boolean = c match { case ' '|'\n'|'\r' => true case _ => false }
     def ns(s:String) = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
@@ -113,13 +117,14 @@ object BuildScript {
       Debugger.fromString(ns((xml\"debugger" ).text)),
       BuildConfig.fromString(ns((xml\"config" ).text)).get,
       softDevice = ns((xml\"softdevice" ).text),
+      debuggerOpt = (xml\"debuggeropt"\"opt").map{ x => ns(x.text)}.toList,
+      jRttViewOpt = (xml\"jrttview"\"opt").map{ x => ns(x.text)}.toList,
       cflags = (xml\"cflags"\"flag").map{ x => ns(x.text)}.toList,
       ldflags = (xml\"ldflags"\"flag").map{ x => ns(x.text)}.toList,
       asflags = (xml\"asflags"\"flag").map{ x => ns(x.text)}.toList,
       sources = (xml\"sources"\"file").map{ x => ns(x.text)}.toList,
       modules = (xml\"modules"\"file").map{ x => ns(x.text)}.toList,
-      libraries = (xml\"libraries"\"file").map{ x => ns(x.text)}.toList,
-      generated = (xml\"generated"\"append").map{ x => (ns((x\"name").text),ns((x\"content").text))}.toList
+      libraries = (xml\"libraries"\"file").map{ x => ns(x.text)}.toList
     )}
 
   lazy val uccmDirectory : String  = {
@@ -150,5 +155,8 @@ object BuildScript {
   lazy val uccmImportsRepoFile: File = new File("~imports")
 
   var enableDevOpts: Boolean = true
+
+  var buildDirFile: File = null
+
 }
 

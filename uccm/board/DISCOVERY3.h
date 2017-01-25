@@ -30,7 +30,7 @@ __Inline
 void ucSetup_Board()
 {
     HAL_Init();
-    ucConfig_SystemClock_HSE8_72_wUSB();
+    ucConfig_SystemClock_HSE8_72_wUSB(/*bypass=*/true);
     ucSetup_BoardLEDs();
     ucSetup_BoardButtons();
 }

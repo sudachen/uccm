@@ -118,6 +118,7 @@
 
 #include <stm32f3xx.h>
 #include "stm32fx_general.h"
+#include "stm32fx_jlink.h"
 
 __Inline
 void ucSetup_BoardUSB()

@@ -5,39 +5,8 @@
                          really this file is included by board.h */
 #include "../leg.h"   /* for the same purpose */
 
-#ifndef GPIOC
-#define UC_GPIOC NULL
-#else
-#define UC_GPIOC GPIOC
-#endif
-#ifndef GPIOD
-#define UC_GPIOD NULL
-#else
-#define UC_GPIOD GPIOD
-#endif
-#ifndef GPIOE
-#define UC_GPIOE NULL
-#else
-#define UC_GPIOE GPIOE
-#endif
-#ifndef GPIOF
-#define UC_GPIOF NULL
-#else
-#define UC_GPIOF GPIOF
-#endif
 
-GPIO_TypeDef *const ucConst_GPIO_TABLE[] =
-{
-    GPIOA,GPIOB,UC_GPIOC,UC_GPIOD,UC_GPIOE,UC_GPIOF
-#ifdef _DEBUG
-    0,0,0,0,0,0,0,0,0,0
-#endif
-};
-
-#undef UC_GPIOC
-#undef UC_GPIOD
-#undef UC_GPIOE
-#undef UC_GPIOF
+extern GPIO_TypeDef *const ucConst_GPIO_TABLE[]; // it's in ROM
 
 __Inline
 void ucSetup_InputLeg(UcLeg leg, UcInputLegOpt opt)
@@ -113,11 +82,13 @@ void ucSetup_Analog(UcLeg leg)
     HAL_GPIO_Init(ucConst_GPIO_TABLE[leg.leg_no>>4],&pinDef);
 }
 
+__Inline
 bool ucGet_Leg(UcLeg leg)
 {
     return ucConst_GPIO_TABLE[leg.leg_no>>4]->IDR & (1<<(leg.leg_no&0xf)) != 0;
 }
 
+__Inline
 uint16_t ucGet_Legset(UcLeg leg, unsigned count)
 {
     uint16_t mask = (0xffff >> (16-count)) << (leg.leg_no&0xf);
@@ -139,6 +110,7 @@ void ucToggle_Leg(UcLeg leg)
     ucConst_GPIO_TABLE[leg.leg_no>>4]->ODR^=(1<<(leg.leg_no&0xf));
 }
 
+__Inline
 void ucSet_Legset(UcLeg first_leg, unsigned count, uint16_t value)
 {
     uint16_t mask = (0xffff >> (16-count)) << (first_leg.leg_no&0xf);

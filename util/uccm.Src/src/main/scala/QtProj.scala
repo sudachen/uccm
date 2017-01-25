@@ -255,7 +255,8 @@ object QtProj {
     val debuggerOpt = if ( buildScript.debugger.isEmpty ) "" else "--"+Debugger.stringify(buildScript.debugger.get)
     val buildCfgOpt = "--"+BuildConfig.stringify(buildScript.config)
     val compilerOpt = "--"+Compiler.stringify(buildScript.ccTool)
-    val uccmArgs = List(compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
+    val boardOpt = "-b "+buildScript.boardName
+    val uccmArgs = List(boardOpt,compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
 
     val qtUser =
 <qtcreator>
@@ -282,7 +283,7 @@ object QtProj {
         <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
           <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
             <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs}</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --build</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>

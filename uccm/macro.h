@@ -71,7 +71,7 @@
 
 #define C_SLIST_LINK_BACK(T,L,O,E) \
     do { T **l = &L; \
-        while ( *l != E ) l = &l->next; \
+        while ( *l != E ) l = &(*l)->next; \
         O->next = *l; *l = O; \
     } while(0)
 

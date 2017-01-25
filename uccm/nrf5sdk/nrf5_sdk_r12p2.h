@@ -34,15 +34,10 @@
 #pragma uccm let(RAM_APP_BASE)?= 0
 #endif
 
-#ifdef __keil_v5
-#pragma uccm asflags+= --pd "__STACK_SIZE SETA {$STACK_SIZE}" --pd "__HEAP_SIZE SETA {$HEAP_SIZE}"
-#endif
-#pragma uccm cflags+= -D__STACK_SIZE={$STACK_SIZE} -D__HEAP_SIZE={$HEAP_SIZE}
-
 #pragma uccm default(softdevice)= BLE
 #pragma uccm default(debugger)= nrfjprog
-#pragma uccm debugger(nrfjprog)+= -f NRF51
 #pragma uccm debugger(jrttview)+= -ct usb -speed 4000 -a -if swd
+
 #pragma uccm xcflags(gcc)+= -I "{TOOLCHAIN}/gcc"
 #pragma uccm xcflags(armcc)+= -I "{TOOLCHAIN}/arm"
 #pragma uccm xcflags(*)+= -I[@inc] \
@@ -84,7 +79,7 @@
 
 #endif
 
-#pragma uccm require(end) += {UCCM}/uccm/nrf5sdk/nrf5_support.c
+#pragma uccm require(source) += {UCCM}/uccm/nrf5sdk/nrf5_support.c
 
 #if defined _DEEBUG || defined _FORCE_ASSERT
 

@@ -1,19 +1,27 @@
 package com.sudachen.uccm
 
 import java.io.{File, FileWriter, PrintWriter}
+
 import org.apache.commons.io.FileUtils
+
 import scala.util.{Failure, Success, Try}
-import sys.process._
+import sys.process.{ProcessLogger, _}
 import scala.io.Source
+import scala.sys.process
+import scala.util.matching.Regex
 
 object Prog {
 
   object Target extends Enumeration {
-    val Clean, Reconfig, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart, RttView = Value
+    val
+    Clean, Reconfig, Build,
+    Softdevice, Erase, Program, Connect, Reset,
+    Qte, QteStart, RttView, JSTlink
+    = Value
   }
 
   case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
-                         targets:  Set[Target.Value] = Set(Target.Build),
+                         targets:  Set[Target.Value] = Set(),
                          board:    Option[String] = None,
                          compiler: Option[Compiler.Value] = None,
                          debugger: Option[Debugger.Value] = None,
@@ -64,7 +72,7 @@ object Prog {
         text("skip project build action")
 
       opt[Unit]("clean").
-        action( (_,c) => c.copy(targets = c.targets + Target.Clean - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Clean)).
         text("remove intermediate files and target firmware")
 
       opt[Unit]("program-softdevice").
@@ -76,7 +84,7 @@ object Prog {
         text("erase uC memory")
 
       opt[Unit]("program").
-        action( (_,c) => c.copy(targets = c.targets + Target.Program)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Program + Target.Build)).
         text("reprogram uC flash memory")
 
       opt[Unit]('r',"reset").
@@ -92,23 +100,27 @@ object Prog {
         text("build for board")
 
       opt[Unit]('j',"project").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
         text("update project only")
 
       opt[Unit]("edit").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
         text("update project and start code editor")
 
       opt[Unit]("rtt-view").
-        action( (_,c) => c.copy(targets = c.targets + Target.RttView - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.RttView)).
         text("start SEGGER jLinkRTTView terminal connected to uC")
 
+      opt[Unit]("jlink-stlink").
+        action( (_,c) => c.copy(targets = Set(Target.JSTlink))).
+        text("start SEGGER STLinkReflash.exe utility and exit")
+
       opt[Unit]("reconfig").
-        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig)).
         text("reconfigure only")
 
       opt[Unit]("rebuild").
-        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig + Target.Build)).
         text("reconfigure and do clean build")
 
       opt[Unit]("release").
@@ -165,12 +177,31 @@ object Prog {
     }
 
     cmdlParser.parse(argv, CmdlOptions()) match {
-      case Some(cmdlOpts) => act(cmdlOpts)
+      case Some(cmdlOpts) =>
+        if ( cmdlOpts.targets.isEmpty ) {
+          cmdlParser.showUsage()
+          System.exit(1)
+        }
+        act(cmdlOpts)
       case None =>
     }
   }
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
+
+  def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
+    case Some(m) =>
+      m.group(2).split('|').toList.dropWhile{x => !sys.env.contains(x)} match {
+        case e::_ => expandEnv(s.replace(m.group(1),sys.env(e)))
+        case Nil => None
+      }
+    case None => Some(s)
+  }
+
+  def expandEnv(s:Option[String]):Option[String] = s match {
+    case None => None
+    case Some(ss) => expandEnv(ss)
+  }
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
@@ -188,6 +219,30 @@ object Prog {
     }
 
     val projectDir = mainFile.getParentFile
+
+    if ( cmdlOpts.targets.contains(Target.JSTlink) ) {
+      val stlr = "STLinkReflash.exe"
+
+      if (Components.dflt.getComponentHome("jstlink").isEmpty)
+        if ( cmdlOpts.yes ) {
+          info(s"getting $stlr now")
+          if (!Components.dflt.acquireComponent("jstlink"))
+            panic(s"failed to download $stlr")
+        } else {
+          panic(s"looks like it's required to download $stlr, restart with -y")
+        }
+
+      val homeFile:File = expandEnv(Components.dflt.getComponentHome("jstlink")) match {
+        case Some(path) if new File(path).exists => new File(path)
+        case Some(path) =>
+          panic(s"homedir of $stlr expands to nonexistant path '$path'"); null
+        case None =>
+          panic(s"looks like homedir of $stlr uses undefined environment variable"); null
+      }
+
+      //Util.winExePath(new File(homeFile,stlr).getAbsolutePath).!
+      System.exit(3)
+    }
 
     if ( !mainFile.exists && !cmdlOpts.newMain )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
@@ -218,6 +273,8 @@ object Prog {
     val buildDir = new File(".",s"~$targetBoard")
     val buildScriptFile = new File(buildDir,"script.xml")
 
+    BuildScript.buildDirFile = buildDir
+
     val targets =
       if (!buildDir.exists || !buildScriptFile.exists)
         cmdlOpts.targets + Target.Reconfig
@@ -246,15 +303,6 @@ object Prog {
 
     if ( !objDir.exists ) objDir.mkdirs()
     if ( !incDir.exists ) incDir.mkdirs()
-
-    def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
-      case Some(m) =>
-        m.group(2).split('|').toList.dropWhile{x => !sys.env.contains(x)} match {
-          case e::_ => expandEnv(s.replace(m.group(1),sys.env(e)))
-          case Nil => None
-        }
-      case None => Some(s)
-    }
 
     def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
 
@@ -503,30 +551,54 @@ object Prog {
           case Pragma.Require("lib",value) => bs.copy(libraries = value :: bs.libraries)
           case Pragma.Require("begin",value) => bs.copy(begin = value :: bs.begin)
           case Pragma.Require("end",value) => bs.copy(end = value :: bs.end)
-          case Pragma.Append(tag,value) => bs.copy(generatedPart = (tag, (x:BuildScript) => value) :: bs.generatedPart )
-          case Pragma.AppendEx(tag,value) => bs.copy(generatedPart = (tag, (x:BuildScript) => expandVar(x.lets)(expandAlias(value))) :: bs.generatedPart )
+          case Pragma.Append(tag,value) => bs.copy(generatedPart = (tag, (x : Any) => value) :: bs.generatedPart )
+          case Pragma.AppendEx(tag,value) => bs.copy(generatedPart = (tag, (x : Map[String,String]) => expandVar(x)(expandAlias(value))) :: bs.generatedPart )
           case Pragma.Let(name,value) => bs.copy(lets = bs.lets + (name -> value) )
           case Pragma.LetIfNo(name,value) => if ( bs.lets.contains(name) ) bs else bs.copy(lets = bs.lets + (name -> value) )
           case Pragma.Debugger(`debuggerTag`,opt) => bs.copy(debuggerOpt = opt :: bs.debuggerOpt)
           case Pragma.Debugger("jrttview",opt) => bs.copy(jRttViewOpt = opt :: bs.jRttViewOpt)
+          case Pragma.Copy(tag,value) => bs.copy(copyfile = bs.copyfile + (tag -> FileCopy(tag,value)))
+
+          case Pragma.Replace(tag,value) =>
+            val rr = value.drop(1).split(value.charAt(0))
+            verbose(s"${rr(0)}=>${rr(1)}")
+            val ff = (x:String,q:Map[String,String]) => new Regex(rr(0)).findFirstMatchIn(x) match {
+              case Some(g) => g.before(1).toString + rr(1) + g.after(1).toString
+              case None => x
+            }
+            val old = bs.copyfile(tag)
+            bs.copy(copyfile = bs.copyfile + (tag -> old.copy(replace = ff :: old.replace) ) )
+
+          case Pragma.ReplaceEx(tag,value) =>
+            val rr = value.drop(1).split(value.charAt(0))
+            verbose(s"${rr(0)}=>expandVar(expandAlias(${rr(1)}))")
+            bs.copy(copyfile = bs.copyfile + (tag -> bs.copyfile(tag).copy(replace =
+              ((x:String,q:Map[String,String]) => new Regex(rr(0)).findFirstMatchIn(x) match {
+                case Some(g) => g.before(1).toString + expandVar(q)(expandAlias(rr(1))) + g.after(1).toString
+                case None => x
+              }) :: bs.copyfile(tag).replace )))
+
           case _ => bs
         }
       } match {
-        case bs => println(bs.lets); bs.copy(
-          softDevice = targetSoftDevice,
-          generated = bs.generatedPart.map{t => (t._1,t._2(bs))}.reverse,
-          cflags = bs.cflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          ldflags = bs.ldflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          asflags = bs.asflags.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)},
-          modules = bs.modules.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          libraries = bs.libraries.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          debuggerOpt = bs.debuggerOpt.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          jRttViewOpt = bs.jRttViewOpt.map{expandAlias}.map{expandVar(bs.lets)}.reverse,
-          generatedPart = Nil,
-          begin = Nil,
-          end = Nil,
-          lets = Map()
+        case bs =>
+          val ulets = bs.lets + ("FIRMWARE_FILE_HEX"->targetHex.getPath)
+          bs.copy(
+            softDevice = targetSoftDevice,
+            generated = bs.generatedPart.map{t => (t._1,t._2(ulets))}.reverse,
+            cflags = bs.cflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            ldflags = bs.ldflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            asflags = bs.asflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)},
+            modules = bs.modules.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            libraries = bs.libraries.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            debuggerOpt = bs.debuggerOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            jRttViewOpt = bs.jRttViewOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            copyfile = bs.copyfile.mapValues{ v => v.copy(replace = v.replace.reverse) },
+            lets = ulets,
+            generatedPart = Nil,
+            begin = Nil,
+            end = Nil
         )
       }
     }
@@ -568,6 +640,19 @@ object Prog {
     }
 
     info(s"uccm is using softdevice ${buildScript.softDevice}")
+
+    if ( targets.contains(Target.Reconfig) )
+      buildScript.lets.foreach { case (name, value) => verbose(s"$name => $value") }
+
+    if ( targets.contains(Target.Reconfig) )
+      buildScript.copyfile.foreach {
+        case ( _, cpf ) =>
+          def repl(s:String) = cpf.replace.foldLeft(s) { (s,r) => r(s,buildScript.lets) }
+          Try{ Util.copyFileToDir(incDir, expandAlias(cpf.from), cpf.to, repl) } match {
+            case Success(_) =>
+            case Failure(e) => panic(e.getMessage)
+          }
+      }
 
     if ( targets.contains(Target.Reconfig) )
       buildScript.generated.foreach {
@@ -642,7 +727,7 @@ object Prog {
       }
 
       val lt = deps.foldLeft(0L) {
-        (t, f) => Math.max(new File(f).lastModified(),t)
+        (t, f) => Math.max(new File(f).lastModified(), t)
       }
 
       val objects = buildScript.sources.foldLeft(List[String]()) {
@@ -682,55 +767,55 @@ object Prog {
             panic(s"failed to generate ${targetAsm.getPath}")
         }
       }
+    }
 
-      if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
-        if (targetDebugger.isEmpty)
-          panic("debuger is not defined")
-        else {
-          val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
+    if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
+      if (targetDebugger.isEmpty)
+        panic("debuger is not defined")
+      else {
+        val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
 
-          val targetsSet =
-            if (targets(Target.Program) && targets(Target.Reset))
-              targets - Target.Reset
-            else
-              targets
+        val targetsSet =
+          if (targets(Target.Program) && targets(Target.Reset))
+            targets - Target.Reset
+          else
+            targets
 
-          lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
-            case "RAW" => None
-            case tag =>
-              if (softDeviceMap.contains(tag)) {
-                val fileName = expandAlias(softDeviceMap(tag))
-                info(s"using softdevice '$fileName'")
-                Some(new File(fileName))
-              } else {
-                panic(s"unknown softdevice $tag")
-                None
-              }
-          }
-
-          targetsOrder.filter {
-            targetsSet(_)
-          } foreach { t =>
-            (t match {
-              case Target.Erase =>
-                Debugger.erase(buildScript.debugger.get, buildScript.debuggerOpt)
-              case Target.Program =>
-                Debugger.program(buildScript.debugger.get, targetHex,
-                  targets.contains(Target.Reset), buildScript.debuggerOpt)
-              case Target.Reset =>
-                Debugger.reset(buildScript.debugger.get, buildScript.debuggerOpt)
-              case Target.Connect =>
-                Debugger.connect(buildScript.debugger.get, buildScript.debuggerOpt)
-              case Target.Softdevice =>
-                Debugger.programSoftDevice(buildScript.debugger.get, buildScript.debuggerOpt, softDeviceHex)
-            }) match {
-              case Failure(f) =>
-                panic(f.getMessage)
-              case _ =>
+        lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
+          case "RAW" => None
+          case tag =>
+            if (softDeviceMap.contains(tag)) {
+              val fileName = expandAlias(softDeviceMap(tag))
+              info(s"using softdevice '$fileName'")
+              Some(new File(fileName))
+            } else {
+              panic(s"unknown softdevice $tag")
+              None
             }
+        }
+
+        targetsOrder.filter {
+          targetsSet(_)
+        } foreach { t =>
+          (t match {
+            case Target.Erase =>
+              Debugger.erase(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Program =>
+              Debugger.program(buildScript.debugger.get, targetHex,
+                targets.contains(Target.Reset), buildScript.debuggerOpt)
+            case Target.Reset =>
+              Debugger.reset(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Connect =>
+              Debugger.connect(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Softdevice =>
+              Debugger.programSoftDevice(buildScript.debugger.get, buildScript.debuggerOpt, softDeviceHex)
+          }) match {
+            case Failure(f) =>
+              panic(f.getMessage)
+            case _ =>
           }
         }
-    }
+      }
 
     info("succeeded")
 
@@ -748,7 +833,7 @@ object Prog {
 
     if ( targets.contains(Target.RttView) ) {
       Debugger.jRttView(buildScript.jRttViewOpt) match {
-        case Success(_) => info("wait a little, SEGGER JLinkRTTView is starting ...")
+        case Success(_) => info("wait a little, SEGGER JLinkRTTViewer is starting ...")
         case Failure(e) => BuildConsole.error(e.getMessage)
       }
     }
