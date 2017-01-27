@@ -23,18 +23,18 @@ for %%i in (%*) do if %%i == --no-dev set UCCM100DEV=
 if not "%UCCM100DEV%" == "" goto :exec_dev_version
 
 :exec_no_dev
-if not exist "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" call :update_uccm
+if exist "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" goto :uccm100
+cmd /c java -jar %PROGNAME%
+if %errorlevel% EQU 0 goto :eof
+echo "failed to acquire uCcm build manager"
+exit 1
+:uccm100
 if %errorlevel% NEQ 0 exit 1
 "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" %*
 
 :do_self_update
 if exist "%UCCM100REPO%\uccm-uccm100" rmdir /Q /S "%UCCM100REPO%\uccm-uccm100"
-call :update_uccm
-if %errorlevel% EQU 0 goto :eof
-exit 1
-
-:update_uccm
-java -jar %PROGNAME%
+cmd /c java -jar %PROGNAME%
 if %errorlevel% EQU 0 goto :eof
 echo "failed to acquire uCcm build manager"
 exit 1
