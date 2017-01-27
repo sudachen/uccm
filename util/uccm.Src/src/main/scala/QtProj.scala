@@ -33,7 +33,7 @@ object QtProj {
     }
   }
 
-  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"uccm-qte420")
+  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-420")
   lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte420-log.xml")
   lazy val qteSettingsFile = new File(BuildScript.uccmRepoDirectoryFile,".qte")
 
@@ -110,15 +110,26 @@ object QtProj {
     def write(nst:InstallStatus) = xml.XML.save(qteInstalLogFile.getAbsolutePath,nst.toXML)
 
     (if ( !st.editorIsOk ) {
-      if ( qteInstallDir.exists ) FileUtils.deleteDirectory(qteInstallDir)
-      if (Components.dflt.acquireComponent("qte420")) {
+      if (Components.dflt.acquireComponent("qte")) {
+        val cmdl = List(new File(qteInstallDir,"vcredist\\vcredist_msvc2015_x86.exe").getAbsolutePath,"/passive","/quite").mkString(" ")
+        BuildConsole.verbose(cmdl)
+        Try {
+          val err = cmdl.!
+          if ( 0 != err && 1638 != err )
+            BuildConsole.panic(s"failed to install VS2015 C++ runtime, error $err")
+        } match {
+          case Failure(e) => BuildConsole.panicBt(
+            "failed to execute VS2015 C++ runtime setup: "+e.getMessage,
+            e.getStackTrace)
+          case Success(_) =>
+        }
         val nst = st.copy(editorIsOk = true); write(nst); Some(nst)
       }
       else None
     } else Some(st)) match {
       case None => false
       case Some(nst) =>
-        val rx = ".*\\[\\/](\\w+).xml$".r
+        val rx = ".*[\\/](\\w+).xml$".r
         val patRepo = "%UCCM100REPO%"
         val repoPath = BuildScript.uccmRepoDirectory.map{ case '\\' => '/' case x => x }
         val patUccm = "%UCCM100HOME%"
@@ -131,7 +142,7 @@ object QtProj {
             s.substring(0,n) + repoPath + expand(tail)
           case _ => s.indexOf(uccmPath) match {
             case n if n >= 0 =>
-              val tail = s.substring(n+patRepo.length)
+              val tail = s.substring(n+patUccm.length)
               s.substring(0,n) + uccmPath + expand(tail)
             case _ => s
           }
@@ -139,6 +150,7 @@ object QtProj {
 
         def p(n:String) : Option[String => String] = n match {
           case rx(s) =>
+            println(s)
             Some( t => expand(t) )
           case _ => None
         }
@@ -255,7 +267,8 @@ object QtProj {
     val debuggerOpt = if ( buildScript.debugger.isEmpty ) "" else "--"+Debugger.stringify(buildScript.debugger.get)
     val buildCfgOpt = "--"+BuildConfig.stringify(buildScript.config)
     val compilerOpt = "--"+Compiler.stringify(buildScript.ccTool)
-    val uccmArgs = List(compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
+    val boardOpt = "-b "+buildScript.boardName
+    val uccmArgs = List(boardOpt,compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
 
     val qtUser =
 <qtcreator>
@@ -282,7 +295,7 @@ object QtProj {
         <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
           <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
             <value type="bool" key="ProjectExplorer.BuildStep.Enabled">true</value>
-            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs}</value>
+            <value type="QString" key="ProjectExplorer.ProcessStep.Arguments">{uccmArgs} --build</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.Command">{uccmCmd.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProcessStep.WorkingDirectory">{workDir.getPath}</value>
             <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Custom Process Step</value>

@@ -23,6 +23,11 @@ object Pragma {
   case class SoftDevice(tag:String, value:String) extends Pragma
   case class SoftDeviceAls(tag:String, value:String) extends Pragma
   case class Debugger(tag:String, value:String) extends Pragma
+  case class Let(tag:String, value:String) extends Pragma
+  case class LetIfNo(tag:String, value:String) extends Pragma
+  case class Replace(tag:String, value:String) extends Pragma
+  case class ReplaceEx(tag:String, value:String) extends Pragma
+  case class Copy(tag:String, value:String) extends Pragma
 
   def extractFromTempFile(tempFile:File) : Stream[Pragma] = {
     def js(s: Stream[Pragma]) : Stream[Pragma] = s match {
@@ -47,24 +52,29 @@ object Pragma {
   def extractFrom(file:File) : Stream[Pragma] = {
     def js: Stream[String] = extractStrings(file)
 
-    val rXcflags = "#pragma\\s*uccm\\s*xcflags\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rDebugger= "#pragma\\s*uccm\\s*debugger\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rBoard   = "#pragma\\s*uccm\\s*board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rSoftDevice  = "#pragma\\s*uccm\\s*softdevice\\(([\\+\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rSoftDeviceAls  = "#pragma\\s*uccm\\s*softdevice\\(([\\+\\w]+)\\)\\s*=>\\s*(.+)$".r
-    val rHome    = "#pragma\\s*uccm\\s*home\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rAlias   = "#pragma\\s*uccm\\s*alias\\(([A-Z_0-9]+)\\)\\s*=\\s*(.+)$".r
-    val rCflags  = "#pragma\\s*uccm\\s*cflags\\s*\\+?=\\s*(.+)$".r
-    val rLdflags = "#pragma\\s*uccm\\s*ldflags\\s*\\+?=\\s*(.+)$".r
-    val rAsflags = "#pragma\\s*uccm\\s*asflags\\s*\\+?=\\s*(.+)$".r
-    val rRequire = "#pragma\\s*uccm\\s*require\\((\\w+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rFile    = "#pragma\\s*uccm\\s*file\\(([\\.\\-\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
-    val rFileEx  = "#pragma\\s*uccm\\s*file\\(([\\.\\-\\w]+)\\)\\s*\\~=\\s*(.+)$".r
-    val rDefault = "#pragma\\s*uccm\\s*default\\((\\w+)\\)\\s*=\\s*(.+)$".r
-    val rInfo    = "#pragma\\s*uccm\\s*info\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
-    val rDownload= "#pragma\\s*uccm\\s*download\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rXcflags = "#pragma\\s+uccm\\s+xcflags\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rDebugger= "#pragma\\s+uccm\\s+debugger\\(([\\*\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rBoard   = "#pragma\\s+uccm\\s+board\\(([\\*\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rSoftDevice  = "#pragma\\s+uccm\\s+softdevice\\(([\\+\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rSoftDeviceAls  = "#pragma\\s+uccm\\s+softdevice\\(([\\+\\w]+)\\)\\s*=>\\s*(.+)$".r
+    val rHome    = "#pragma\\s+uccm\\s+home\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rAlias   = "#pragma\\s+uccm\\s+alias\\(([A-Z_0-9]+)\\)\\s*=\\s*(.+)$".r
+    val rCflags  = "#pragma\\s+uccm\\s+cflags\\s*\\+?=\\s*(.+)$".r
+    val rLdflags = "#pragma\\s+uccm\\s+ldflags\\s*\\+?=\\s*(.+)$".r
+    val rAsflags = "#pragma\\s+uccm\\s+asflags\\s*\\+?=\\s*(.+)$".r
+    val rRequire = "#pragma\\s+uccm\\s+require\\((\\w+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rCopy    = "#pragma\\s+uccm\\s+copy\\(([\\.\\-\\w]+)\\)\\s*\\=\\s*(.+)$".r
+    val rFile    = "#pragma\\s+uccm\\s+file\\(([\\.\\-\\w]+)\\)\\s*\\+?=\\s*(.+)$".r
+    val rFileEx  = "#pragma\\s+uccm\\s+file\\(([\\.\\-\\w]+)\\)\\s*\\~=\\s*(.+)$".r
+    val rDefault = "#pragma\\s+uccm\\s+default\\((\\w+)\\)\\s*=\\s*(.+)$".r
+    val rInfo    = "#pragma\\s+uccm\\s+info\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rDownload= "#pragma\\s+uccm\\s+download\\(([\\+\\.\\w]+)\\)\\s*=\\s*(.+)$".r
     val rInclude = "^#include\\s*<(uccm/./././[\\/\\.\\-\\+\\w]+)>\\s*$".r
     val rImport  = "^#include\\s*<~(\\w+)/(\\w+)/import.h>\\s*$".r
+    val rLet     = "#pragma\\s+uccm\\s+let\\(([\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rLetIfNo = "#pragma\\s+uccm\\s+let\\(([\\w]+)\\)\\s*\\?=\\s*(.+)$".r
+    val rReplace = "#pragma\\s+uccm\\s+replace\\(([\\.\\-\\w]+)\\)\\s*=\\s*(.+)$".r
+    val rReplaceEx = "#pragma\\s+uccm\\s+replace\\(([\\.\\-\\w]+)\\)\\s*~=\\s*(.+)$".r
 
     def ns(s:String) = {
       val ss = s.dropRight(s.length-s.lastIndexWhere {' '.!= }-1)
@@ -92,6 +102,11 @@ object Pragma {
       case rSoftDevice(tag,value) => Some(SoftDevice(tag,ns(value)))
       case rDebugger(tag,value) => Some(Debugger(tag,ns(value)))
       case rImport(accname,modname) => Some(Import(accname,modname))
+      case rLet(tag,value) => Some(Let(tag,ns(value)))
+      case rLetIfNo(tag,value) => Some(LetIfNo(tag,ns(value)))
+      case rReplace(tag,value) => Some(Replace(tag,ns(value)))
+      case rReplaceEx(tag,value) => Some(ReplaceEx(tag,ns(value)))
+      case rCopy(tag,value) => Some(Copy(tag,ns(value)))
       case _ => None
     }
 

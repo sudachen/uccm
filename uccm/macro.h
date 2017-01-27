@@ -62,3 +62,21 @@
 #define C_MAP(_Q, Sps, ...) C_APPLY(_Q, 0, Sps, __VA_ARGS__)
 #define C_UNWRAP(x) x
 #define C_PUSHFRONT(_,List) (_, C_UNWRAP List)
+
+#define C_SLIST_UNLINK(T,L,O,E) \
+    for ( T **l = &L; *l != E; l = &(*l)->next ) \
+        {if ( *l == O ) { *l = (*l)->next; O->next = NULL; break; }}
+
+#define C_SLIST_LINK_FRONT(L,O,E) do { O->next = L; L = O; } while(0)
+
+#define C_SLIST_LINK_BACK(T,L,O,E) \
+    do { T **l = &L; \
+        while ( *l != E ) l = &(*l)->next; \
+        O->next = *l; *l = O; \
+    } while(0)
+
+#define C_SLIST_LINK_WHEN(P,T,L,O,E) \
+    do { T **l = &L; T *_ = L;\
+        while ( *l != E && !(P) ) { l = &(*l)->next; _ = *l; }\
+        O->next = *l; *l = O; \
+    } while(0)

@@ -1,12 +1,13 @@
 
 package com.sudachen.uccm
 
-import java.io.{File, FileOutputStream, FileWriter, PrintWriter}
+import java.io._
 import java.net.{HttpURLConnection, URL}
 import java.util.zip.ZipFile
 
 import scala.io.BufferedSource
 import scala.collection.JavaConverters._
+import scala.sys.process._
 
 object Util {
 
@@ -42,7 +43,7 @@ object Util {
 
                 val bs = new BufferedSource(is)
                 val pw = new PrintWriter(os)
-                bs.getLines().foreach { s => pw.println(p(s)) }
+                try bs.getLines().foreach { s => pw.println(p(s)) } finally pw.flush()
 
               case None =>
 
@@ -128,6 +129,29 @@ object Util {
       }
     }
     dst
+  }
+
+  def copyFileToDir(dirFile:File, from:String,to:String,replace:String=>String): Unit = {
+
+    val is = io.Source.fromFile(from)
+    try {
+      val os = new FileWriter(new File(dirFile, to))
+      try
+        is.getLines().foreach {
+          s => os.write(replace(s)+"\n")
+        }
+      finally os.close()
+    } finally is.close()
+
+  }
+
+  def mlink(from:File,to:File) : Int = {
+    val fromWhere = from.getAbsolutePath.map { case '/' => '\\' case x => x }
+    val toWhere = to.getAbsolutePath.map { case '/' => '\\' case x => x }
+    val cmdl = List("cmd", "/c", "mklink", "/J", quote(toWhere), quote(fromWhere)).mkString(" ")
+    BuildConsole.verbose(cmdl)
+    val pl = ProcessLogger(s=>Unit,s=>println(s))
+    cmdl!pl
   }
 
 }

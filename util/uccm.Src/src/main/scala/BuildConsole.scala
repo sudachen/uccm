@@ -23,6 +23,11 @@ object BuildConsole {
       System.out.println(verbose_prefix + text + color_suffix)
   }
 
+  def verboseInfo(text :String) :Unit = {
+    if ( beVerbose )
+      System.out.println(info_prefix + text + color_suffix)
+  }
+
   def barUpdate(old:Int,append:Int,total:Int) : Int = {
     if ( total > 0 ) {
       val step = Math.max(total / 50, 1)

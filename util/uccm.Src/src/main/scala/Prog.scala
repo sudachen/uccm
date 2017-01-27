@@ -1,19 +1,27 @@
 package com.sudachen.uccm
 
 import java.io.{File, FileWriter, PrintWriter}
+
 import org.apache.commons.io.FileUtils
+
 import scala.util.{Failure, Success, Try}
-import sys.process._
+import sys.process.{ProcessLogger, _}
 import scala.io.Source
+import scala.sys.process
+import scala.util.matching.Regex
 
 object Prog {
 
   object Target extends Enumeration {
-    val Clean, Reconfig, Build, Softdevice, Erase, Program, Connect, Reset, Qte, QteStart = Value
+    val
+    Clean, Reconfig, Build, ListBoards,
+    Softdevice, Erase, Program, Connect, Reset,
+    Qte, QteStart, RttView, JSTlink
+    = Value
   }
 
-  case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Release,
-                         targets:  Set[Target.Value] = Set(Target.Build),
+  case class CmdlOptions(buildConfig: BuildConfig.Value = BuildConfig.Debug,
+                         targets:  Set[Target.Value] = Set(),
                          board:    Option[String] = None,
                          compiler: Option[Compiler.Value] = None,
                          debugger: Option[Debugger.Value] = None,
@@ -64,7 +72,7 @@ object Prog {
         text("skip project build action")
 
       opt[Unit]("clean").
-        action( (_,c) => c.copy(targets = c.targets + Target.Clean - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Clean)).
         text("remove intermediate files and target firmware")
 
       opt[Unit]("program-softdevice").
@@ -76,7 +84,7 @@ object Prog {
         text("erase uC memory")
 
       opt[Unit]("program").
-        action( (_,c) => c.copy(targets = c.targets + Target.Program)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Program + Target.Build)).
         text("reprogram uC flash memory")
 
       opt[Unit]('r',"reset").
@@ -91,28 +99,44 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
+      opt[Unit]('l',"list-boards").
+        action( (x,c) => c.copy(targets = c.targets + Target.ListBoards)).
+        text("list supported boards")
+
       opt[Unit]('j',"project").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
         text("update project only")
 
       opt[Unit]("edit").
-        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Qte + Target.QteStart)).
         text("update project and start code editor")
 
+      //opt[Unit]("debug").
+      //  action( (_,c) => c.copy()).
+      //  text("connect debugger to uC, may be used with --reset")
+
+      opt[Unit]("rtt-view").
+        action( (_,c) => c.copy(targets = c.targets + Target.RttView)).
+        text("start SEGGER jLinkRTTView terminal connected to uC")
+
+      opt[Unit]("jlink-stlink").
+        action( (_,c) => c.copy(targets = Set(Target.JSTlink))).
+        text("start SEGGER STLinkReflash.exe utility and exit")
+
       opt[Unit]("reconfig").
-        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig - Target.Build)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig)).
         text("reconfigure only")
 
       opt[Unit]("rebuild").
-        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig)).
+        action( (_,c) => c.copy(targets = c.targets + Target.Reconfig + Target.Build)).
         text("reconfigure and do clean build")
 
       opt[Unit]("release").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Release)).
-        text("[on rebuild/reconfig] configure for release build (by default)")
+        action( (x,c) => c.copy(buildConfig = BuildConfig.Release) ).
+        text("[on rebuild/reconfig] configure for release build")
 
       opt[Unit]("debug").
-        action( (_,c) => c.copy(buildConfig = BuildConfig.Debug)).
+        action( (x,c) => c.copy(buildConfig = BuildConfig.Debug) ).
         text("[on rebuild/reconfig] configure for debug build")
 
       opt[String]('D',"define").
@@ -161,12 +185,31 @@ object Prog {
     }
 
     cmdlParser.parse(argv, CmdlOptions()) match {
-      case Some(cmdlOpts) => act(cmdlOpts)
+      case Some(cmdlOpts) =>
+        if ( cmdlOpts.targets.isEmpty ) {
+          cmdlParser.showUsage()
+          System.exit(1)
+        }
+        act(cmdlOpts)
       case None =>
     }
   }
 
   def getCurrentDirectory : String = new File(".").getCanonicalPath
+
+  def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
+    case Some(m) =>
+      m.group(2).split('|').toList.dropWhile{x => !sys.env.contains(x)} match {
+        case e::_ => expandEnv(s.replace(m.group(1),sys.env(e)))
+        case Nil => None
+      }
+    case None => Some(s)
+  }
+
+  def expandEnv(s:Option[String]):Option[String] = s match {
+    case None => None
+    case Some(ss) => expandEnv(ss)
+  }
 
   def act(cmdlOpts: CmdlOptions) : Unit = {
 
@@ -177,13 +220,47 @@ object Prog {
     val panic: String => Unit = BuildConsole.panic
     val info: String => Unit = BuildConsole.info
     val verbose: String => Unit = BuildConsole.verbose
+    val verboseInfo: String => Unit = BuildConsole.verboseInfo
 
     val mainFile :File = cmdlOpts.mainFile match {
       case Some(f) => new File(f.getName)
       case None => new File("./main.c")
     }
 
+    val uccmHome = BuildScript.uccmDirectoryFile
+
+    if ( cmdlOpts.targets.contains(Target.ListBoards) ) {
+      listBoards(uccmHome).sorted.foreach {
+        println
+      }
+      System.exit(0)
+    }
+
     val projectDir = mainFile.getParentFile
+
+    if ( cmdlOpts.targets.contains(Target.JSTlink) ) {
+      val stlr = "STLinkReflash.exe"
+
+      if (Components.dflt.getComponentHome("jstlink").isEmpty)
+        if ( cmdlOpts.yes ) {
+          info(s"getting $stlr now")
+          if (!Components.dflt.acquireComponent("jstlink"))
+            panic(s"failed to download $stlr")
+        } else {
+          panic(s"looks like it's required to download $stlr, restart with -y")
+        }
+
+      val homeFile:File = expandEnv(Components.dflt.getComponentHome("jstlink")) match {
+        case Some(path) if new File(path).exists => new File(path)
+        case Some(path) =>
+          panic(s"homedir of $stlr expands to nonexistant path '$path'"); null
+        case None =>
+          panic(s"looks like homedir of $stlr uses undefined environment variable"); null
+      }
+
+      //Util.winExePath(new File(homeFile,stlr).getAbsolutePath).!
+      System.exit(3)
+    }
 
     if ( !mainFile.exists && !cmdlOpts.newMain )
       panic("main file \"" + mainFile.getCanonicalPath + "\" does not exist")
@@ -201,18 +278,18 @@ object Prog {
       case Some(boardName) => boardName
     }}
 
-    val uccmHome = BuildScript.uccmDirectoryFile
-
-    val boardPragmas : List[Pragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) ++ mainPragmas match {
+    val boardPragmas : List[Pragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) match {
       case Nil =>
         panic(s"unknown board $targetBoard"); Nil
-      case lst => lst
+      case lst => lst ++ mainPragmas
     }
 
     info(s"uccm is working now for board $targetBoard")
 
     val buildDir = new File(".",s"~$targetBoard")
     val buildScriptFile = new File(buildDir,"script.xml")
+
+    BuildScript.buildDirFile = buildDir
 
     val targets =
       if (!buildDir.exists || !buildScriptFile.exists)
@@ -242,15 +319,6 @@ object Prog {
 
     if ( !objDir.exists ) objDir.mkdirs()
     if ( !incDir.exists ) incDir.mkdirs()
-
-    def expandEnv(s:String):Option[String] = "(\\%([\\|\\w]+)\\%)".r findFirstMatchIn s match {
-      case Some(m) =>
-        m.group(2).split('|').toList.dropWhile{x => !sys.env.contains(x)} match {
-          case e::_ => expandEnv(s.replace(m.group(1),sys.env(e)))
-          case Nil => None
-        }
-      case None => Some(s)
-    }
 
     def dirExists(s:String):Boolean = { val f = new File(s); f.exists && f.isDirectory }
 
@@ -307,10 +375,16 @@ object Prog {
           val f = new File(buildDir, m.group(2))
           val expand = expandHome(e)
           if (!f.exists && dirExists(expand)) {
-            verbose(s"$f => $expand")
-            val cmdl = "cmd /c mklink /J \"" + f.getAbsolutePath.replace("/", "\\") + "\" \"" + expand.replace("/", "\\") + "\""
-            info(cmdl)
-            cmdl.!
+            info(s"$f => $expand")
+            Try {
+              Util.mlink(new File(expand),f)
+            } match {
+              case Success(ecode) =>
+                if ( ecode != 0 )
+                  panic("could not create simbolic link")
+              case Failure(ee) =>
+                BuildConsole.panicBt(ee.getMessage,ee.getStackTrace)
+            }
           }
           expandAlias(s.replace(m.group(1),f.getPath))
       }
@@ -393,6 +467,7 @@ object Prog {
     if ( !mainFile.exists ){
       val wr = new PrintWriter(mainFile)
       wr.println(s"#pragma uccm default(board)= $targetBoard")
+      wr.println("#pragma uccm let(HEAP_SIZE)= 0")
       if ( cmdlOpts.softDevice.isDefined)
         wr.println(s"#pragma uccm default(softdevice)= ${cmdlOpts.softDevice.isDefined}")
       if ( cmdlOpts.compiler.isDefined )
@@ -409,6 +484,37 @@ object Prog {
       wr.println("    for(;;) __NOP();")
       wr.println("}")
       wr.close()
+    }
+
+    val preTargetDebugger =
+      if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger
+      else boardPragmas.foldLeft( Option.empty[Debugger.Value] ) {
+        (opt,prag) => prag match {
+          case Pragma.Default("debugger",name) => Debugger.fromString(name)
+          case _ => opt
+        }
+      }
+
+    if ( targets.contains(Target.Reconfig) ) {
+      if (preTargetDebugger.isDefined) {
+        info(s"uccm is using ${Debugger.stringify(preTargetDebugger.get)} programmer")
+        if (Debugger.isRequiredToInstallSoftware(preTargetDebugger.get)) {
+          if (!cmdlOpts.yes)
+            panic(s"looks like required to download and install ${Debugger.softPakName(preTargetDebugger.get)}, restart with -y")
+          else if (!Debugger.install(preTargetDebugger.get))
+            panic(s"failed to install ${Debugger.stringify(preTargetDebugger.get)}")
+        }
+      } else
+        info(s"uccm is not using any programmer")
+    }
+
+    if ( targets.contains(Target.RttView) ) {
+      if ( Debugger.isRequiredToInstallSoftware(Debugger.JLINK) ) {
+        if ( !cmdlOpts.yes )
+          panic(s"looks like required to download and install SEGGER j-Link utilities, restart with -y")
+        else if (!Debugger.install(Debugger.JLINK))
+          panic("failed to install SEGGER j-Link utilities")
+      }
     }
 
     def extractFromPreprocessor : BuildScript = {
@@ -433,8 +539,23 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
+      def expandVar(lets: Map[String,String])(s: String): String = "(\\{\\$([\\w]+)\\})".r findFirstMatchIn s match {
+        case None => s
+        case Some(m) => lets.get(m.group(2)) match {
+          case None =>
+            panic(s"unknown var '${m.group(2)}' is used");s
+          case Some(value) =>
+            expandVar(lets)(s.replace(m.group(1),value))
+        }
+      }
+
+      val debuggerTag = preTargetDebugger match {
+        case Some(kind) => Debugger.stringify(kind)
+        case None => ";"
+      }
+
       Pragma.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetBoard,targetCompiler,None,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,targetCompiler,preTargetDebugger,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {
@@ -454,24 +575,54 @@ object Prog {
           case Pragma.Require("lib",value) => bs.copy(libraries = value :: bs.libraries)
           case Pragma.Require("begin",value) => bs.copy(begin = value :: bs.begin)
           case Pragma.Require("end",value) => bs.copy(end = value :: bs.end)
-          case Pragma.Append(tag,value) => bs.copy(generated = (tag,value) :: bs.generated )
-          case Pragma.AppendEx(tag,value) => bs.copy(generated = (tag,expandAlias(value)) :: bs.generated )
-          case Pragma.Default("debugger",value) => bs.copy( debugger = Debugger.fromString(value) )
+          case Pragma.Append(tag,value) => bs.copy(generatedPart = (tag, (x : Any) => value) :: bs.generatedPart )
+          case Pragma.AppendEx(tag,value) => bs.copy(generatedPart = (tag, (x : Map[String,String]) => expandVar(x)(expandAlias(value))) :: bs.generatedPart )
+          case Pragma.Let(name,value) => bs.copy(lets = bs.lets + (name -> value) )
+          case Pragma.LetIfNo(name,value) => if ( bs.lets.contains(name) ) bs else bs.copy(lets = bs.lets + (name -> value) )
+          case Pragma.Debugger(`debuggerTag`,opt) => bs.copy(debuggerOpt = opt :: bs.debuggerOpt)
+          case Pragma.Debugger("jrttview",opt) => bs.copy(jRttViewOpt = opt :: bs.jRttViewOpt)
+          case Pragma.Copy(tag,value) => bs.copy(copyfile = bs.copyfile + (tag -> FileCopy(tag,value)))
+
+          case Pragma.Replace(tag,value) =>
+            val rr = value.drop(1).split(value.charAt(0))
+            verbose(s"${rr(0)}=>${rr(1)}")
+            val ff = (x:String,q:Map[String,String]) => new Regex(rr(0)).findFirstMatchIn(x) match {
+              case Some(g) => g.before(1).toString + rr(1) + g.after(1).toString
+              case None => x
+            }
+            val old = bs.copyfile(tag)
+            bs.copy(copyfile = bs.copyfile + (tag -> old.copy(replace = ff :: old.replace) ) )
+
+          case Pragma.ReplaceEx(tag,value) =>
+            val rr = value.drop(1).split(value.charAt(0))
+            verbose(s"${rr(0)}=>expandVar(expandAlias(${rr(1)}))")
+            bs.copy(copyfile = bs.copyfile + (tag -> bs.copyfile(tag).copy(replace =
+              ((x:String,q:Map[String,String]) => new Regex(rr(0)).findFirstMatchIn(x) match {
+                case Some(g) => g.before(1).toString + expandVar(q)(expandAlias(rr(1))) + g.after(1).toString
+                case None => x
+              }) :: bs.copyfile(tag).replace )))
+
           case _ => bs
         }
       } match {
-        case bs => bs.copy(
-          softDevice = targetSoftDevice,
-          generated = bs.generated.reverse,
-          cflags = bs.cflags.map{expandAlias}.reverse,
-          ldflags = bs.ldflags.map{expandAlias}.reverse,
-          asflags = bs.asflags.map{expandAlias}.reverse,
-          sources = bs.begin.map{expandAlias}.reverse ++
-                    bs.sources.map{expandAlias}.reverse ++
-                    bs.end.map{expandAlias},
-          modules = bs.modules.map{expandAlias}.reverse,
-          libraries = bs.libraries.map{expandAlias}.reverse,
-          debugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else bs.debugger
+        case bs =>
+          val ulets = bs.lets + ("FIRMWARE_FILE_HEX"->targetHex.getPath)
+          bs.copy(
+            softDevice = targetSoftDevice,
+            generated = bs.generatedPart.map{t => (t._1,t._2(ulets))}.reverse,
+            cflags = bs.cflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            ldflags = bs.ldflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            asflags = bs.asflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)},
+            modules = bs.modules.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            libraries = bs.libraries.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            debuggerOpt = bs.debuggerOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            jRttViewOpt = bs.jRttViewOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            copyfile = bs.copyfile.mapValues{ v => v.copy(replace = v.replace.reverse) },
+            lets = ulets,
+            generatedPart = Nil,
+            begin = Nil,
+            end = Nil
         )
       }
     }
@@ -483,11 +634,9 @@ object Prog {
             imp => Try {
               val userDir = new File(incDir, s"~${imp.ghUser}")
               if (!userDir.exists) userDir.mkdir()
-              val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
-              val toWhere = new File(userDir, s"${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
-              val cmdl = List("cmd", "/c", "mklink", "/J", Util.quote(toWhere), Util.quote(fromWhere)).mkString(" ")
-              verbose(cmdl)
-              cmdl.!
+              val targFile = new File(userDir, s"${imp.name}")
+              info(s"${targFile.getPath} =>${imp.dirFile.getPath}")
+              Util.mlink(imp.dirFile,targFile)
             } match {
               case Success(ecode) =>
                 if ( ecode != 0 )
@@ -506,45 +655,60 @@ object Prog {
       else
         BuildScript.fromXML(scala.xml.XML.loadFile(buildScriptFile))
 
+    val targetDebugger = buildScript.debugger
+
     if ( targets.contains(Target.Reconfig) ) {
+
       scala.xml.XML.save(buildScriptFile.getCanonicalPath, buildScript.toXML)
+
     } else {
+
       info(s"uccm is using ${Compiler.stringify(buildScript.ccTool)} compiler")
+      if ( !targets.contains(Target.Reconfig) ) {
+        if (targetDebugger.isDefined)
+          info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} programmer")
+        else
+          info(s"uccm is not using any programmer")
+      }
+
     }
 
-    info(s"uccm is using softdevice ${buildScript.softDevice}")
+    if ( buildScript.softDevice.toUpperCase == "RAW" )
+      info(s"uccm is not using any softdevice")
+    else
+      info(s"uccm is using softdevice ${buildScript.softDevice}")
 
-    val targetDebugger = if ( cmdlOpts.debugger.isDefined ) cmdlOpts.debugger else buildScript.debugger
-    if ( targetDebugger.isDefined ) {
-      info(s"uccm is using ${Debugger.stringify(targetDebugger.get)} debugger")
-      if ( Debugger.isRequiredToInstallSoftware(targetDebugger.get) ) {
-        if ( cmdlOpts.yes )
-          Debugger.install(targetDebugger.get)
-        else
-          panic(s"looks like required to download and install ${Debugger.stringify(targetDebugger.get)} component, restart with -y")
+    info(s"uccm is configured for ${BuildConfig.stringify(buildScript.config)}")
+
+    if ( targets.contains(Target.Reconfig) ) {
+      info("using next values:")
+      buildScript.lets.foreach {
+        case (name, value) => info(s"  $name => $value")
       }
-    } else
-      info(s"uccm is not using any debugger")
-
-    val dbgConnect:List[String] = targetDebugger match {
-      case Some(debugger) =>
-        val tag = Debugger.stringify(debugger)
-        boardPragmas.foldLeft( List[String]() ) {
-          (dbg, prag) => prag match {
-            case Pragma.Debugger(`tag`,opts) => opts :: dbg
-            case _ => dbg
-          }}
-      case None => Nil
     }
 
     if ( targets.contains(Target.Reconfig) )
-      buildScript.generated.foreach {
-        case ( fname, content ) =>
-          val text = content.replace("\\n","\n").replace("\\t","\t")
-          val wr = new FileWriter(new File(incDir,fname),true)
-          wr.write(text)
+      buildScript.copyfile.foreach {
+        case ( _, cpf ) =>
+          info("copying with edit to "+cpf.to)
+          def repl(s:String) = cpf.replace.foldLeft(s) { (s,r) => r(s,buildScript.lets) }
+          Try{ Util.copyFileToDir(incDir, expandAlias(cpf.from), cpf.to, repl) } match {
+            case Success(_) =>
+            case Failure(e) => panic(e.getMessage)
+          }
+      }
+
+    if ( targets.contains(Target.Reconfig) ) {
+      buildScript.generated.foldRight(Map[String,List[String]]()) {
+        (t,m) => t match { case (name, content) => m + (name -> (content :: m.getOrElse(name,Nil))) }
+      }.foreach {
+        case (fname, content) =>
+          info("generating "+fname)
+          val wr = new FileWriter(new File(incDir, fname), true)
+          content.foreach { s => wr.write(s.replace("\\n", "\n").replace("\\t", "\t")) }
           wr.close()
       }
+    }
 
     val depsFile = new File(buildDir,"depends.txt")
     def mkdeps() = {
@@ -555,6 +719,7 @@ object Prog {
       val where = local(buildDir.getPath)
       val rx = ("("+where+"/inc/~?[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
       if ( depsFile.exists ) depsFile.delete()
+      info(s"resolving headers dependenses on ${mainFile.getName}")
       val wr = new FileWriter(depsFile, false)
       val pl = ProcessLogger(s =>
         rx.findAllMatchIn(rightSlash(s)).foreach {
@@ -610,7 +775,7 @@ object Prog {
       }
 
       val lt = deps.foldLeft(0L) {
-        (t, f) => Math.max(new File(f).lastModified(),t)
+        (t, f) => Math.max(new File(f).lastModified(), t)
       }
 
       val objects = buildScript.sources.foldLeft(List[String]()) {
@@ -650,55 +815,55 @@ object Prog {
             panic(s"failed to generate ${targetAsm.getPath}")
         }
       }
+    }
 
-      if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
-        if (targetDebugger.isEmpty)
-          panic("debuger is not defined")
-        else {
-          val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
+    if (targets.intersect(Set(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)).nonEmpty)
+      if (targetDebugger.isEmpty)
+        panic("programmer is not defined")
+      else {
+        val targetsOrder = List(Target.Softdevice, Target.Erase, Target.Program, Target.Reset, Target.Connect)
 
-          val targetsSet =
-            if (targets(Target.Program) && targets(Target.Reset))
-              targets - Target.Reset
-            else
-              targets
+        val targetsSet =
+          if (targets(Target.Program) && targets(Target.Reset))
+            targets - Target.Reset
+          else
+            targets
 
-          lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
-            case "RAW" => None
-            case tag =>
-              if (softDeviceMap.contains(tag)) {
-                val fileName = expandAlias(softDeviceMap(tag))
-                info(s"using softdevice '$fileName'")
-                Some(new File(fileName))
-              } else {
-                panic(s"unknown softdevice $tag")
-                None
-              }
-          }
-
-          targetsOrder.filter {
-            targetsSet(_)
-          } foreach { t =>
-            (t match {
-              case Target.Erase =>
-                Debugger.erase(buildScript.debugger.get, dbgConnect)
-              case Target.Program =>
-                Debugger.program(buildScript.debugger.get, targetHex,
-                  targets.contains(Target.Reset), dbgConnect)
-              case Target.Reset =>
-                Debugger.reset(buildScript.debugger.get, dbgConnect)
-              case Target.Connect =>
-                Debugger.connect(buildScript.debugger.get, dbgConnect)
-              case Target.Softdevice =>
-                Debugger.programSoftDevice(buildScript.debugger.get, dbgConnect, softDeviceHex)
-            }) match {
-              case Failure(f) =>
-                panic(f.getMessage)
-              case _ =>
+        lazy val softDeviceHex: Option[File] = buildScript.softDevice match {
+          case "RAW" => None
+          case tag =>
+            if (softDeviceMap.contains(tag)) {
+              val fileName = expandAlias(softDeviceMap(tag))
+              info(s"using softdevice '$fileName'")
+              Some(new File(fileName))
+            } else {
+              panic(s"unknown softdevice $tag")
+              None
             }
+        }
+
+        targetsOrder.filter {
+          targetsSet(_)
+        } foreach { t =>
+          (t match {
+            case Target.Erase =>
+              Debugger.erase(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Program =>
+              Debugger.program(buildScript.debugger.get, targetHex,
+                targets.contains(Target.Reset), buildScript.debuggerOpt)
+            case Target.Reset =>
+              Debugger.reset(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Connect =>
+              Debugger.connect(buildScript.debugger.get, buildScript.debuggerOpt)
+            case Target.Softdevice =>
+              Debugger.programSoftDevice(buildScript.debugger.get, buildScript.debuggerOpt, softDeviceHex)
+          }) match {
+            case Failure(f) =>
+              panic(f.getMessage)
+            case _ =>
           }
         }
-    }
+      }
 
     info("succeeded")
 
@@ -714,11 +879,17 @@ object Prog {
       case Failure(e) => BuildConsole.error(e.getMessage)
     }
 
+    if ( targets.contains(Target.RttView) ) {
+      Debugger.jRttView(buildScript.jRttViewOpt) match {
+        case Success(_) => info("wait a little, SEGGER JLinkRTTViewer is starting ...")
+        case Failure(e) => BuildConsole.error(e.getMessage)
+      }
+    }
+
     System.exit(0)
   }
 
-  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[Pragma] = {
-
+  def boardPragmas(uccmHome:File) : Stream[List[Pragma]] = {
     val boardDir = new File(uccmHome,"uccm/board")
     val localBoardDir = new File(getCurrentDirectory,"board")
 
@@ -733,21 +904,33 @@ object Prog {
       else
         Nil
 
-    val boardPragmas = {
-      if ( boardDir.exists && boardDir.isDirectory )
-        f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
-      else
-        Stream.empty
-    } find {
-        _.exists {
-          case Pragma.Board(`targetBoard`,_) => true
-          case _ => false
-        }
-    }
+    if ( boardDir.exists && boardDir.isDirectory )
+      f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
+    else
+      Stream.empty
+  }
 
-    if ( boardPragmas.nonEmpty )
-      Pragma.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ boardPragmas.get
+  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[Pragma] = {
+    val pragmas = boardPragmas(uccmHome).find {
+      _.exists {
+        case Pragma.Board(`targetBoard`,_) => true
+        case _ => false
+      }
+    }
+    if ( pragmas.nonEmpty )
+      Pragma.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ pragmas.get
     else
       Nil
   }
+
+  def listBoards(uccmHome:File) : List[String] = boardPragmas(uccmHome).
+    foldLeft(Set[String]()){
+      (s, l) => l.foldLeft(s){
+        (ss, p) => p match {
+            case Pragma.Board(tag,_) => ss + tag
+            case _ => ss
+        }
+      }
+    }.toList
+
 }

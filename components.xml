@@ -67,64 +67,26 @@
     <rev>612</rev>
   </component>
   <component>
-    <name>qte420</name>
-    <althome>%UCCM100REPO%/uccm-qte420</althome>
+    <name>jstlink</name>
+    <althome></althome>
+    <download>https://www.segger.com/downloads/jlink/STLinkReflash_161221.zip</download>
+    <description>SEGGER ST-link &lt;=&gt; J-Link convertion utility</description>
+    <type>archive</type>
+    <root></root>
+    <args></args>
+    <file></file>
+    <rev>612</rev>
+  </component>
+  <component>
+    <name>qte</name>
+    <althome></althome>
     <download>http://qt.mirror.constant.com/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <download>http://linorg.usp.br/Qt/official_releases/qtcreator/4.2/4.2.0/qt-creator-opensource-windows-x86-4.2.0.exe</download>
     <description>QtCerator 4</description>
-    <type>setup</type>
+    <type>qtarchive</type>
     <rev>420</rev>
-    <args>--script "&amp;file&amp;"</args>
-    <file><![CDATA[
-function Controller() {
-    installer.autoRejectMessageBoxes();
-    installer.installationFinished.connect(function() {
-        gui.clickButton(buttons.NextButton);
-    })
-}
-
-Controller.prototype.WelcomePageCallback = function() {
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.CredentialsPageCallback = function() {
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.IntroductionPageCallback = function() {
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.TargetDirectoryPageCallback = function()
-{
-var checkBoxForm = gui.currentPageWidget().AssociateCommonFiletypesForm
-    checkBoxForm.AssociateCommonFiletypesCheckBox.checked = false;
-    gui.currentPageWidget().TargetDirectoryLineEdit.setText("%UCCM100REPO%/uccm-qte420");
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.LicenseAgreementPageCallback = function() {
-    gui.currentPageWidget().AcceptLicenseRadioButton.setChecked(true);
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.StartMenuDirectoryPageCallback = function() {
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.ReadyForInstallationPageCallback = function()
-{
-    gui.clickButton(buttons.NextButton);
-}
-
-Controller.prototype.FinishedPageCallback = function() {
-var checkBoxForm = gui.currentPageWidget().LaunchQtCreatorCheckBoxForm
-    if (checkBoxForm && checkBoxForm.launchQtCreatorCheckBox) {
-        checkBoxForm.launchQtCreatorCheckBox.checked = false;
-    }
-    gui.clickButton(buttons.FinishButton);
-}]]>
-    </file>
+    <args></args>
+    <file></file>
     <root></root>
   </component>
 </catalog>

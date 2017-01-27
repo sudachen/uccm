@@ -109,11 +109,13 @@ void ucSetup_Analog(UcLeg leg)
 {
 }
 
+__Inline
 bool ucGet_Leg(UcLeg leg)
 {
     return (NRF_GPIO->IN & ((uint32_t)1<<(leg.leg_no&0x1f))) != 0;
 }
 
+__Inline
 uint16_t ucGet_Legset(UcLeg leg, unsigned count)
 {
     __Assert(count <= 16);
@@ -142,6 +144,7 @@ void ucToggle_Leg(UcLeg leg)
         NRF_GPIO->OUTSET = mask;
 }
 
+__Inline
 void ucSet_Legset(UcLeg first_leg, unsigned count, uint16_t value)
 {
     uint32_t mask = (0xffffffff >> (32-count)) << (first_leg.leg_no&0x1f);

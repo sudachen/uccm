@@ -6,16 +6,18 @@ import scala.util.{Failure, Success, Try}
 import sys.process._
 
 object PakType extends Enumeration {
-  val Setup, Archive = Value
+  val Setup, Archive, QtArchive = Value
 
   def fromString(s:String):Value = s.toLowerCase match {
     case "setup" => Setup
     case "archive" => Archive
+    case "qtarchive" => QtArchive
   }
 
   def stringify(kind:Value):String = kind match {
     case Setup => "setup"
     case Archive => "archive"
+    case QtArchive => "qtarchive"
   }
 
 }
@@ -102,6 +104,34 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
     fIsGoodTmp.renameTo(fIsGood)
   }
 
+  def qtUnpack(file:File, cinfo:ComponentInfo) : Try[Unit] = Try {
+    val fIsGood = mkIsGood(cinfo)
+    if (fIsGood.exists) fIsGood.delete()
+    val dir = mkPakDir(cinfo)
+    if (dir.exists) FileUtils.deleteDirectory(dir)
+    val tmpDir = new File(dir,".tmp")
+    tmpDir.mkdir()
+
+    val pl = ProcessLogger(s=>Unit,s=>println(s))
+    val z7a = BuildScript.uccmDirectory + "\\util\\7za.exe"
+    val cmdl1 = List(z7a,"x","-y","-t#","-O\""+tmpDir.getAbsolutePath+"\"","\""+file.getAbsolutePath+"\"").mkString(" ")
+    BuildConsole.verbose(cmdl1)
+    if ( 0 != (cmdl1!pl) )
+      throw new RuntimeException("7-zip was failed on stage 1")
+    tmpDir.listFiles{_.getName.endsWith(".7z")}.foreach{ f =>
+      val cmdl3 = List(z7a,"x","-y","-O\""+dir.getAbsolutePath+"\"","\""+f.getAbsolutePath+"\"").mkString(" ")
+      BuildConsole.verbose(cmdl3)
+      if ( 0 != (cmdl3!pl) )
+        throw new RuntimeException("7-zip was failed on stage 3")
+    }
+
+    FileUtils.deleteDirectory(tmpDir)
+
+    val fIsGoodTmp = new File(fIsGood.getPath+".tmp")
+    xml.XML.save(fIsGoodTmp.getPath,cinfo.toXML)
+    fIsGoodTmp.renameTo(fIsGood)
+  }
+
   def queryRevision(name:String,rev:Option[String]) : Option[ComponentInfo] = {
     if ( !catalog.contains(name) )
         None
@@ -138,6 +168,7 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
               val ok = (cinfo.pakType match {
                 case PakType.Archive => unpack(file,cinfo)
                 case PakType.Setup => setup(file,cinfo)
+                case PakType.QtArchive => qtUnpack(file,cinfo)
               }) match {
                 case Failure(e) =>
                   System.err.println(e.getMessage)
@@ -169,9 +200,9 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
       else {
         val fIsGood = mkIsGood(pak)
         val fPakDir = mkPakDir(pak)
-        if (!fIsGood.exists || !fPakDir.exists)
+        if (!fIsGood.exists || !fPakDir.exists){
           None
-        else if (pak.root.isEmpty) {
+        }else if (pak.root.isEmpty) {
           Some(fPakDir.getAbsolutePath)
         } else {
           val fRootDir = new File(fPakDir, pak.root.get)

@@ -67,7 +67,7 @@ object Debugger extends Enumeration {
   private[Debugger] lazy val nrfJprog = getNrfjprogCli match {
     case Some(cli) => cli
     case None =>
-      BuildConsole.panic("nrfjprog software is not installed"); ""
+      BuildConsole.panic("Nordic J-Prog software is not installed"); ""
   }
 
   private[Debugger] def findStlinkCli: Try[Option[String]] = Try {
@@ -108,7 +108,57 @@ object Debugger extends Enumeration {
   private[Debugger] lazy val stLinkCli = getStlinkCli match {
     case Some(cli) => cli
     case None =>
-      BuildConsole.panic("stlink software is not installed"); ""
+      BuildConsole.panic("STM32 ST-Link software is not installed"); ""
+  }
+
+  private[Debugger] def findJlinkCli: Try[Option[String]] = Try {
+    val rxPath = "^\\s*InstallPath\\s+REG_SZ\\s+(.+)$".r
+    val rxVersion = "^\\s*CurrentVersion\\s+REG_DWORD\\s+0x(.+)$".r
+
+    val where = List(
+      "HKLM\\SOFTWARE\\WOW6432Node\\SEGGER\\J-Link",
+      "HKLM\\SOFTWARE\\SEGGER\\J-Link")
+
+    where.map { x =>
+      var path: Option[String] = None
+      var ver: Option[String] = None
+      val cmdl = "reg query \"" + x + "\" /s "
+      cmdl ! ProcessLogger(s => s match {
+        case rxPath(p) => path = Some(p)
+        case rxVersion(v) => ver = Some(v)
+        case _ =>
+      }, s => Unit)
+      (path,ver)
+    }.collectFirst { case (Some(p),Some(v)) => (p,Integer.parseInt(v,16)) } match {
+      case Some(t) =>
+        val path = t._1
+        val ver = t._2
+        val exeFile = Util.ns(path) + "JLink.exe"
+        if (new File(exeFile).exists && ver >= 61200)
+          Some(exeFile)
+        else
+          None
+      case None => None
+    }
+  }
+
+  private[Debugger] def getJlinkCli: Option[String] = {
+    findJlinkCli match {
+      case Success(optCli) => optCli match {
+        case Some(s) => Some(Util.winExePath(s))
+        case None => None
+      }
+      case Failure(e) =>
+        BuildConsole.stackTrace(e.getStackTrace)
+        BuildConsole.panic(s"error occured ${e.getMessage}")
+        None
+    }
+  }
+
+  private[Debugger] lazy val jLinkCli = getJlinkCli match {
+    case Some(cli) => cli
+    case None =>
+      BuildConsole.panic("SEGGER J-Link software is not installed"); ""
   }
 
   def program(kind: Value, firmwareHex: File, doReset: Boolean, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -124,6 +174,16 @@ object Debugger extends Enumeration {
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
         throw new RuntimeException("failed to execute nrfjprog command")
+    case JLINK =>
+      val script =
+        if (doReset)
+          new File(BuildScript.buildDirFile,"inc/program_reset.jlink")
+        else
+          new File(BuildScript.buildDirFile,"inc/program.jlink")
+      val cmdl = jLinkCli + " -CommanderScript \"" + script.getPath + "\""
+      BuildConsole.verbose(cmdl.toString)
+      if (0 != cmdl.!)
+        throw new RuntimeException("failed to execute jlink")
   })
 
   def reset(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -137,6 +197,12 @@ object Debugger extends Enumeration {
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
         throw new RuntimeException("failed to execute nrfjprog command")
+    case JLINK =>
+      val script = new File(BuildScript.buildDirFile,"inc/reset.jlink")
+      val cmdl = jLinkCli + " -CommanderScript \"" + script.getPath + "\""
+      BuildConsole.verbose(cmdl.toString)
+      if (0 != cmdl.!)
+        throw new RuntimeException("failed to execute jlink")
   })
 
   def connect(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -144,12 +210,18 @@ object Debugger extends Enumeration {
       val cmdl = (List(stLinkCli) ++ connopt ++ List("-c SWD HOTPLUG", "-SCore -CoreReg")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute stlink command")
+        throw new RuntimeException("failed to execute stlink")
     case NRFJPROG =>
       val cmdl = (List(nrfJprog) ++ connopt ++ List("--readregs")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute nrfjprog command")
+        throw new RuntimeException("failed to execute nrfjprog")
+    case JLINK =>
+      val script = new File(BuildScript.buildDirFile,"inc/connect.jlink")
+      val cmdl = jLinkCli + " -CommanderScript \"" + script.getPath + "\""
+      BuildConsole.verbose(cmdl.toString)
+      if (0 != cmdl.!)
+        throw new RuntimeException("failed to execute jlink")
   })
 
   def erase(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
@@ -157,12 +229,20 @@ object Debugger extends Enumeration {
       val cmdl = (List(stLinkCli) ++ connopt ++ List("-c SWD UR", "-ME")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute stlink command")
+        throw new RuntimeException("failed to execute stlink")
+
     case NRFJPROG =>
       val cmdl = (List(nrfJprog) ++ connopt ++ List("-e")).mkString(" ")
       BuildConsole.verbose(cmdl)
       if (0 != cmdl.!)
-        throw new RuntimeException("failed to execute nrfjprog command")
+        throw new RuntimeException("failed to execute nrfjprog")
+
+    case JLINK =>
+      val script = new File(BuildScript.buildDirFile,"inc/erase.jlink")
+      val cmdl = jLinkCli + " -CommanderScript \"" + script.getPath + "\""
+      BuildConsole.verbose(cmdl.toString)
+      if (0 != cmdl.!)
+        throw new RuntimeException("failed to execute jlink")
   })
 
   def programSoftDevice(kind: Value, connopt: List[String], softDeviceHex: Option[File]): Try[Unit] = Try(kind match {
@@ -181,7 +261,7 @@ object Debugger extends Enumeration {
 
   def isRequiredToInstallSoftware(kind: Value): Boolean = kind match {
     case NRFJPROG => getNrfjprogCli.isEmpty
-    //case JLINK => getJlinkCli.isEmpty
+    case JLINK => getJlinkCli.isEmpty
     case STLINK => getStlinkCli.isEmpty
   }
 
@@ -190,4 +270,24 @@ object Debugger extends Enumeration {
     case JLINK => Components.dflt.acquireComponent("jlink")
     case STLINK => Components.dflt.acquireComponent("stlink")
   }
+
+  def softPakName(kind: Value): String = kind match {
+    case NRFJPROG => "Nordic J-Prog utility"
+    case JLINK => "SEGGER J-Link utility"
+    case STLINK => "STM32 ST-LINK utility"
+  }
+
+  def jRttView(opt: List[String]) : Try[Unit] = findJlinkCli match {
+    case Failure(e) => Failure[Unit](e)
+    case Success(s) => Try ( s match {
+      case Some(jlinkcli) =>
+        val jrttExe = Util.winExePath(new File(jlinkcli).getParentFile.getAbsolutePath+"/JlinkRTTViewer.exe")
+        val cmdl = (jrttExe :: opt).mkString(" ")
+        BuildConsole.verbose(cmdl)
+        cmdl.run()
+      case None =>
+        BuildConsole.panic("SEGGER J-Link software is not installed");
+    })
+  }
+
 }

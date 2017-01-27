@@ -18,16 +18,14 @@ set PROGNAME=%~nx0
 if "%UCCM100REPO%"=="" set UCCM100REPO=%LOCALAPPDATA%\uCcm100Repo
 
 for %%i in (%*) do if %%i == --self-update goto :do_self_update
-for %%i in (%*) do if %%i == --no-dev goto :exec_no_dev
+for %%i in (%*) do if %%i == --no-dev set UCCM100DEV=
 
 if not "%UCCM100DEV%" == "" goto :exec_dev_version
 
 :exec_no_dev
 if not exist "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" call :update_uccm
 if %errorlevel% NEQ 0 exit 1
-call "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" %*
-if %errorlevel% EQU 0 goto :eof
-exit 1
+"%UCCM100REPO%\uccm-uccm100\uccm100.cmd" %*
 
 :do_self_update
 if exist "%UCCM100REPO%\uccm-uccm100" rmdir /Q /S "%UCCM100REPO%\uccm-uccm100"
@@ -43,11 +41,16 @@ exit 1
 
 :exec_dev_version
 echo *** Development uCcm version is using now ***
-call %UCCM100DEV%\uccm100.cmd %*
-if %errorlevel% EQU 0 goto :eof
-exit 1
+%UCCM100DEV%\uccm100.cmd %*
 
-goto :eof
+rem
+rem
+rem
+rem
+rem
+rem
+rem
+rem
 rem
 rem
 rem

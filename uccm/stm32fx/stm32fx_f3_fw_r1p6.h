@@ -6,4 +6,3 @@
 #pragma uccm default(debugger)= stlink
 
 #pragma uccm xcflags(*)+= -I[@inc] -I "{CMSIS}/Include" -I "{STM32F3XX}/Include" -I "{STM32HAL}/Inc"
-

@@ -4,6 +4,8 @@
 
 #ifdef NRF51
 
+#pragma uccm debugger(nrfjprog)+= -f NRF51
+
 #ifdef __keil_v5
 #pragma uccm ldflags+= --cpu Cortex-M0
 #pragma uccm asflags+= --cpu Cortex-M0
