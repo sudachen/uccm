@@ -33,7 +33,7 @@ object QtProj {
     }
   }
 
-  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"uccm-qte420")
+  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-420")
   lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte420-log.xml")
   lazy val qteSettingsFile = new File(BuildScript.uccmRepoDirectoryFile,".qte")
 
@@ -110,8 +110,19 @@ object QtProj {
     def write(nst:InstallStatus) = xml.XML.save(qteInstalLogFile.getAbsolutePath,nst.toXML)
 
     (if ( !st.editorIsOk ) {
-      if ( qteInstallDir.exists ) FileUtils.deleteDirectory(qteInstallDir)
-      if (Components.dflt.acquireComponent("qte420")) {
+      if (Components.dflt.acquireComponent("qte")) {
+        val cmdl = List(new File(qteInstallDir,"vcredist\\vcredist_msvc2015_x86.exe").getAbsolutePath,"/passive","/quite").mkString(" ")
+        BuildConsole.verbose(cmdl)
+        Try {
+          val err = cmdl.!
+          if ( 0 != err && 1638 != err )
+            BuildConsole.panic(s"failed to install VS2015 C++ runtime, error $err")
+        } match {
+          case Failure(e) => BuildConsole.panicBt(
+            "failed to execute VS2015 C++ runtime setup: "+e.getMessage,
+            e.getStackTrace)
+          case Success(_) =>
+        }
         val nst = st.copy(editorIsOk = true); write(nst); Some(nst)
       }
       else None

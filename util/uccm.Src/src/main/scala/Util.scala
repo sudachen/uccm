@@ -7,6 +7,7 @@ import java.util.zip.ZipFile
 
 import scala.io.BufferedSource
 import scala.collection.JavaConverters._
+import scala.sys.process._
 
 object Util {
 
@@ -142,6 +143,15 @@ object Util {
       finally os.close()
     } finally is.close()
 
+  }
+
+  def mlink(from:File,to:File) : Int = {
+    val fromWhere = from.getAbsolutePath.map { case '/' => '\\' case x => x }
+    val toWhere = to.getAbsolutePath.map { case '/' => '\\' case x => x }
+    val cmdl = List("cmd", "/c", "mklink", "/J", quote(toWhere), quote(fromWhere)).mkString(" ")
+    BuildConsole.verbose(cmdl)
+    val pl = ProcessLogger(s=>Unit,s=>println(s))
+    cmdl!pl
   }
 
 }

@@ -14,7 +14,7 @@ object Prog {
 
   object Target extends Enumeration {
     val
-    Clean, Reconfig, Build,
+    Clean, Reconfig, Build, ListBoards,
     Softdevice, Erase, Program, Connect, Reset,
     Qte, QteStart, RttView, JSTlink
     = Value
@@ -99,6 +99,10 @@ object Prog {
         action( (x,c) => c.copy(board = Some(x))).
         text("build for board")
 
+      opt[Unit]('l',"list-boards").
+        action( (x,c) => c.copy(targets = c.targets + Target.ListBoards)).
+        text("list supported boards")
+
       opt[Unit]('j',"project").
         action( (_,c) => c.copy(targets = c.targets + Target.Qte)).
         text("update project only")
@@ -127,9 +131,13 @@ object Prog {
         action( (_,c) => c.copy(targets = c.targets + Target.Reconfig + Target.Build)).
         text("reconfigure and do clean build")
 
-      opt[Unit]("final").
+      opt[Unit]("release").
         action( (x,c) => c.copy(buildConfig = BuildConfig.Release) ).
         text("[on rebuild/reconfig] configure for release build")
+
+      opt[Unit]("debug").
+        action( (x,c) => c.copy(buildConfig = BuildConfig.Debug) ).
+        text("[on rebuild/reconfig] configure for debug build")
 
       opt[String]('D',"define").
         action( (x,c) => c.copy(cflags = ("-D"+x)::c.cflags)).
@@ -219,6 +227,15 @@ object Prog {
       case None => new File("./main.c")
     }
 
+    val uccmHome = BuildScript.uccmDirectoryFile
+
+    if ( cmdlOpts.targets.contains(Target.ListBoards) ) {
+      listBoards(uccmHome).sorted.foreach {
+        println
+      }
+      System.exit(0)
+    }
+
     val projectDir = mainFile.getParentFile
 
     if ( cmdlOpts.targets.contains(Target.JSTlink) ) {
@@ -261,12 +278,10 @@ object Prog {
       case Some(boardName) => boardName
     }}
 
-    val uccmHome = BuildScript.uccmDirectoryFile
-
-    val boardPragmas : List[Pragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) ++ mainPragmas match {
+    val boardPragmas : List[Pragma] = preprocessUccmBoardFiles(targetBoard,uccmHome) match {
       case Nil =>
         panic(s"unknown board $targetBoard"); Nil
-      case lst => lst
+      case lst => lst ++ mainPragmas
     }
 
     info(s"uccm is working now for board $targetBoard")
@@ -360,10 +375,16 @@ object Prog {
           val f = new File(buildDir, m.group(2))
           val expand = expandHome(e)
           if (!f.exists && dirExists(expand)) {
-            verbose(s"$f => $expand")
-            val cmdl = "cmd /c mklink /J \"" + f.getAbsolutePath.replace("/", "\\") + "\" \"" + expand.replace("/", "\\") + "\""
-            info(cmdl)
-            cmdl.!
+            info(s"$f => $expand")
+            Try {
+              Util.mlink(new File(expand),f)
+            } match {
+              case Success(ecode) =>
+                if ( ecode != 0 )
+                  panic("could not create simbolic link")
+              case Failure(ee) =>
+                BuildConsole.panicBt(ee.getMessage,ee.getStackTrace)
+            }
           }
           expandAlias(s.replace(m.group(1),f.getPath))
       }
@@ -613,11 +634,9 @@ object Prog {
             imp => Try {
               val userDir = new File(incDir, s"~${imp.ghUser}")
               if (!userDir.exists) userDir.mkdir()
-              val fromWhere = imp.dirFile.getAbsolutePath.map { case '/' => '\\' case x => x }
-              val toWhere = new File(userDir, s"${imp.name}").getAbsolutePath.map { case '/' => '\\' case x => x }
-              val cmdl = List("cmd", "/c", "mklink", "/J", Util.quote(toWhere), Util.quote(fromWhere)).mkString(" ")
-              verbose(cmdl)
-              cmdl.!
+              val targFile = new File(userDir, s"${imp.name}")
+              info(s"${targFile.getPath} =>${imp.dirFile.getPath}")
+              Util.mlink(imp.dirFile,targFile)
             } match {
               case Success(ecode) =>
                 if ( ecode != 0 )
@@ -700,7 +719,7 @@ object Prog {
       val where = local(buildDir.getPath)
       val rx = ("("+where+"/inc/~?[/\\w\\.]+.h|"+where+"/UCCM/[/\\w\\.]+.h|\\s[\\w\\.\\+]+.h)").r
       if ( depsFile.exists ) depsFile.delete()
-      info(s"resolving headers dependensies on ${mainFile.getName}")
+      info(s"resolving headers dependenses on ${mainFile.getName}")
       val wr = new FileWriter(depsFile, false)
       val pl = ProcessLogger(s =>
         rx.findAllMatchIn(rightSlash(s)).foreach {
@@ -870,8 +889,7 @@ object Prog {
     System.exit(0)
   }
 
-  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[Pragma] = {
-
+  def boardPragmas(uccmHome:File) : Stream[List[Pragma]] = {
     val boardDir = new File(uccmHome,"uccm/board")
     val localBoardDir = new File(getCurrentDirectory,"board")
 
@@ -886,21 +904,33 @@ object Prog {
       else
         Nil
 
-    val boardPragmas = {
-      if ( boardDir.exists && boardDir.isDirectory )
-        f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
-      else
-        Stream.empty
-    } find {
-        _.exists {
-          case Pragma.Board(`targetBoard`,_) => true
-          case _ => false
-        }
-    }
+    if ( boardDir.exists && boardDir.isDirectory )
+      f((localBoardFiles ++ boardDir.listFiles.toList).toStream)
+    else
+      Stream.empty
+  }
 
-    if ( boardPragmas.nonEmpty )
-      Pragma.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ boardPragmas.get
+  def preprocessUccmBoardFiles(targetBoard:String,uccmHome:File) : List[Pragma] = {
+    val pragmas = boardPragmas(uccmHome).find {
+      _.exists {
+        case Pragma.Board(`targetBoard`,_) => true
+        case _ => false
+      }
+    }
+    if ( pragmas.nonEmpty )
+      Pragma.extractFrom(new File(uccmHome,"uccm/uccm.h")).toList ++ pragmas.get
     else
       Nil
   }
+
+  def listBoards(uccmHome:File) : List[String] = boardPragmas(uccmHome).
+    foldLeft(Set[String]()){
+      (s, l) => l.foldLeft(s){
+        (ss, p) => p match {
+            case Pragma.Board(tag,_) => ss + tag
+            case _ => ss
+        }
+      }
+    }.toList
+
 }

@@ -225,7 +225,6 @@ object Debugger extends Enumeration {
   })
 
   def erase(kind: Value, connopt: List[String]): Try[Unit] = Try(kind match {
-
     case STLINK =>
       val cmdl = (List(stLinkCli) ++ connopt ++ List("-c SWD UR", "-ME")).mkString(" ")
       BuildConsole.verbose(cmdl)
