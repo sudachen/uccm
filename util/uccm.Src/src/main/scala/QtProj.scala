@@ -110,7 +110,9 @@ object QtProj {
     def write(nst:InstallStatus) = xml.XML.save(qteInstalLogFile.getAbsolutePath,nst.toXML)
 
     (if ( !st.editorIsOk ) {
+      BuildConsole.info("getting QtCreator software")
       if (Components.dflt.acquireComponent("qte")) {
+        BuildConsole.info("installing VS2015 C++ runtime")
         val cmdl = List(new File(qteInstallDir,"vcredist\\vcredist_msvc2015_x86.exe").getAbsolutePath,"/passive","/quite").mkString(" ")
         BuildConsole.verbose(cmdl)
         Try {

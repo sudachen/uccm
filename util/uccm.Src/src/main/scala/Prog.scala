@@ -499,21 +499,29 @@ object Prog {
       if (preTargetDebugger.isDefined) {
         info(s"uccm is using ${Debugger.stringify(preTargetDebugger.get)} programmer")
         if (Debugger.isRequiredToInstallSoftware(preTargetDebugger.get)) {
+          val name = Debugger.softPakName(preTargetDebugger.get)
           if (!cmdlOpts.yes)
-            panic(s"looks like required to download and install ${Debugger.softPakName(preTargetDebugger.get)}, restart with -y")
-          else if (!Debugger.install(preTargetDebugger.get))
-            panic(s"failed to install ${Debugger.stringify(preTargetDebugger.get)}")
+            panic(s"looks like required to download and install $name}, restart with -y")
+          else {
+            info(s"getting $name now")
+            if (!Debugger.install(preTargetDebugger.get))
+              panic(s"failed to install $name")
+          }
         }
       } else
         info(s"uccm is not using any programmer")
     }
 
     if ( targets.contains(Target.RttView) ) {
+      val name = info(s"getting ${Debugger.softPakName(Debugger.JLINK)} now")
       if ( Debugger.isRequiredToInstallSoftware(Debugger.JLINK) ) {
         if ( !cmdlOpts.yes )
-          panic(s"looks like required to download and install SEGGER j-Link utilities, restart with -y")
-        else if (!Debugger.install(Debugger.JLINK))
-          panic("failed to install SEGGER j-Link utilities")
+          panic(s"looks like required to download and install $name, restart with -y")
+        else {
+          info(s"getting $name now")
+          if (!Debugger.install(Debugger.JLINK))
+            panic(s"failed to install $name")
+        }
       }
     }
 

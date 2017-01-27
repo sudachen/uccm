@@ -95,7 +95,7 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
     val z7a = BuildScript.uccmDirectory + "\\util\\7za.exe"
     val cmdl = List(z7a,"x","-y","-O\""+dir.getAbsolutePath+"\"","\""+file.getAbsolutePath+"\"").mkString(" ")
     val pl = ProcessLogger(s=>Unit,s=>Unit)
-    BuildConsole.info(s"unpaking ${cinfo.name}")
+    BuildConsole.info(s"unpacking ${cinfo.name}")
     BuildConsole.verbose(cmdl)
     if ( 0 != (cmdl!pl) )
       throw new RuntimeException("7-zip was failed")
@@ -112,7 +112,7 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
     val tmpDir = new File(dir,".tmp")
     tmpDir.mkdir()
 
-    BuildConsole.info(s"unpaking ${cinfo.name}")
+    BuildConsole.info(s"unpacking ${cinfo.name}")
 
     val pl = ProcessLogger(s=>Unit,s=>println(s))
     val z7a = BuildScript.uccmDirectory + "\\util\\7za.exe"
