@@ -150,7 +150,6 @@ object QtProj {
 
         def p(n:String) : Option[String => String] = n match {
           case rx(s) =>
-            println(s)
             Some( t => expand(t) )
           case _ => None
         }
