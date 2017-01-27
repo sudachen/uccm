@@ -112,6 +112,8 @@ class Components(val repoDir:File, val catalog: Map[String, List[ComponentInfo]]
     val tmpDir = new File(dir,".tmp")
     tmpDir.mkdir()
 
+    BuildConsole.info(s"unpaking ${cinfo.name}")
+
     val pl = ProcessLogger(s=>Unit,s=>println(s))
     val z7a = BuildScript.uccmDirectory + "\\util\\7za.exe"
     val cmdl1 = List(z7a,"x","-y","-t#","-O\""+tmpDir.getAbsolutePath+"\"","\""+file.getAbsolutePath+"\"").mkString(" ")
