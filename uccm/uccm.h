@@ -6,19 +6,25 @@
 #endif
 
 #pragma uccm board(*)= -D_UCCM_VERSION=100
-#pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161
+#pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161,1293,177
 #pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
 
 #ifdef _DEBUG
-#pragma uccm cflags+= -g -O0
+#pragma uccm let(CFLAGS_OPT)?= -g -O0
 #elif defined _RELEASE
-#pragma uccm cflags+= -g -O2
+#ifdef __keil_v5
+#pragma uccm let(CFLAGS_OPT)?= -g -O2
+#else
+#pragma uccm let(CFLAGS_OPT)?= -g -O2 -flto
 #endif
+#endif
+
+#pragma uccm cflags+= {$CFLAGS_OPT}
 
 #ifdef __keil_v5
 #pragma uccm cflags+= --diag_warning=error
 #else
-#pragma uccm cflags+= -Werror
+#pragma uccm cflags+= -Werror -Wall -Wno-missing-braces -Wno-unused-function
 #endif
 
 #ifdef __keil_v5
@@ -28,16 +34,18 @@
 #pragma uccm asflags+= --apcs=interwork --pd "__UVISION_VERSION SETA 520"
 #ifdef USE_MICROLIB
 #pragma uccm cflags+= -D__MICROLIB
-#pragma uccm ldflags+= --library_type=microlib 
+#pragma uccm ldflags+= --library_type=microlib -lm
 #pragma uccm asflags+= --pd "__MICROLIB SETA 1"
 #endif
 #else
-#pragma uccm ldflags+= -mthumb -Wl,--gc-sections,--cref,-Map=[@build]/firmware.map
+#pragma uccm ldflags+= {$CFLAGS_OPT} -mthumb -Wl,--gc-sections,--cref,-Map=[@build]/firmware.map
+#pragma uccm ldflags+= -lc_nano -lm
 #endif
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include "macro.h"
 
 #define __Inline static inline
@@ -67,21 +75,9 @@
 
 #define __Do_Not_Remove __attribute__((used))
 
-enum
-{
-    UC_ERROR_IN_SETUP_BOARD = 1,
-    UC_ERROR_IN_ASSERT,
-    UC_ERROR_IN_SOFTDEVICE,
-    UC_ERROR_IN_SOFTDEVICE_INIT,
-    UC_ERROR_IN_IRQ_HANDLER,
-    UC_ERROR_IN_IRQ_HARDFAULT,
-};
-
-extern void ucFatalError(uint32_t where);
+extern void ucFatalError(void);
 
 #pragma uccm require(end) += {UCCM}/uccm/uccm.c
-
-void ucSetup_Print(void);
 
 typedef struct UcFormatParam UcFormatParam;
 typedef struct UcFormatOpt UcFormatOpt;
@@ -101,8 +97,9 @@ struct UcFormatParam {
     UcFormatPrinter print;
 };
 
+void ucSetup_Print(void);
 void ucPutS(const char *text, bool complete);
-void ucPrintF(size_t argno, const char *fmt, int flags, UcFormatParam *params);
+void ucPrintF(size_t argno, int flags, UcFormatParam *params);
 
 #define C_FORMAT_QUOTE(x,_) x
 
@@ -129,8 +126,13 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 
 #define ucPrintF_Var(nL,Wt,Fmt,...) \
     do {\
-        UcFormatParam params[] = {C_MAP(C_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
-        ucPrintF(sizeof(params)/sizeof(params[0]),(Fmt),(nL?1:0)|(Wt?2:0),params); \
+        UcFormatParam params[] = { {.v = {.str=(Fmt)}}, C_MAP(C_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
+        ucPrintF(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);
+
+#pragma uccm file(uccm_dynamic_defs.h) += #pragma once\n\n
+#ifndef _UCCM_PREPROCESSING
+#include <uccm_dynamic_defs.h>
+#endif

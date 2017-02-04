@@ -28,6 +28,9 @@ extern void ucSoftDeviceFaultHandler(uint32_t id, uint32_t pc, uint32_t info);
 __Inline
 void ucSetup_Board()
 {
+    ucSetup_Print(); // allowes to print assertions
+                     // if any backend imported in main.c
+
 #if SOFTDEVICE_PRESENT
     nrf_clock_lf_cfg_t const clock_lf_cfg =
     {.source        = NRF_CLOCK_LF_SRC_XTAL,

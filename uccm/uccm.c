@@ -24,7 +24,7 @@ bool uccm$criticalEnter()
 #endif
 }
 
-bool uccm$criticalExit(bool nested)
+void uccm$criticalExit(bool nested)
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     sd_nvic_critical_region_exit(nested);
@@ -33,10 +33,10 @@ bool uccm$criticalExit(bool nested)
 #endif
 }
 
-void ucFatalError(uint32_t where)
+void ucFatalError()
 {
   ucError("FATAL ERROR occured");
-  for(;;) __WFE();
+  for(;;) __WFI();
 }
 
 __Weak
@@ -45,9 +45,18 @@ void ucPutS(const char* text, bool complete)
     (void)text;
 }
 
+__Weak
+void ucSetup_Print(void)
+{
+}
+
 struct { uint8_t c; char bf[15]; bool complete; } uccm$printBuf = { 0, };
 
-__Inline
+void uccm$printComplete(bool complete)
+{
+   uccm$printBuf.complete = complete;
+}
+
 void uccm$printChar(char c)
 {
     if ( uccm$printBuf.c == sizeof(uccm$printBuf.bf)-1 )
@@ -58,14 +67,12 @@ void uccm$printChar(char c)
     uccm$printBuf.bf[uccm$printBuf.c++] = c;
 }
 
-__Inline
 void uccm$printStr(const char *s)
 {
     while (*s) uccm$printChar(*s++);
 }
 
-__Inline
-void uccm$flush()
+void uccm$flushPrint()
 {
     if ( uccm$printBuf.c )
     {
@@ -100,10 +107,11 @@ void uccm$printUnsigned10(uint32_t value)
     while ( i-- ) uccm$printChar(bf[i]);
 }
 
-void uccm$printUnsigned16(uint32_t value, size_t width)
+void uccm$printUnsigned16(uint32_t value, size_t width, bool uppercase)
 {
     int i, skip, q;
     static const char f0[] = "0123456789abcdef";
+    static const char f1[] = "0123456789ABCDEF";
 
     if ( width > 8 ) width = 8;
     skip = 8 - width;
@@ -114,7 +122,7 @@ void uccm$printUnsigned16(uint32_t value, size_t width)
         if ( q || !skip )
         {
             skip = 0;
-            uccm$printChar(f0[q]);
+            uccm$printChar(q[uppercase?f0:f1]);
         }
         else --skip;
         value <<= 4;
@@ -134,11 +142,11 @@ void uccm$printInteger(int sign,UcFormatOpt *opt,UcFormatParam *param)
             uccm$printUnsigned10(param->v.u);
     }
     else if ( opt->fmt == 'x' )
-        uccm$printUnsigned16(param->v.u,opt->zfiller?opt->width1:0);
+        uccm$printUnsigned16(param->v.u,opt->zfiller?opt->width1:0,opt->uppercase);
     else if ( opt->fmt == 'p' )
     {
         uccm$printChar('#');
-        uccm$printUnsigned16(param->v.u,opt->zfiller?opt->width1:0);
+        uccm$printUnsigned16(param->v.u,opt->zfiller?opt->width1:0,opt->uppercase);
     }
     else
         uccm$printStr("<invalid>");
@@ -178,32 +186,41 @@ void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param)
     uccm$printInteger(0,&opt1,param);
 }
 
-void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
+void uccm$printFloat(float v, int width2)
 {
     int n = 6;
-    float v = param->v.f;
     if ( v < 0 ) { v = -v; uccm$printChar('-'); }
     uccm$printUnsigned10((uint32_t)v);
-    if ( opt->width2 )
+    if ( width2 )
     {
-        v = v - floor(v);
-        if ( opt->width2 > 0 )
+        v = v - floorf(v);
+        if ( width2 > 0 )
         {
-            n = opt->width2;
+            n = width2;
             while ( n-- ) v *= 10;
         }
         else
         {
             n = 6;
-            while ( n-- && (v - floor(v)) > 0.00001 ) v *= 10;
+            while ( n-- && (v - floorf(v)) > 0.00001 ) v *= 10;
         }
         uccm$printUnsigned10((uint32_t)v);
     }
 }
 
-void ucPrintF(size_t argno, const char *fmt, int flags, UcFormatParam *params)
+void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
+{
+    uccm$printFloat(param->v.f,opt->width2);
+}
+
+void ucPrintF(size_t argno, int flags, UcFormatParam *params)
 {
     UcFormatOpt opt;
+
+    __Assert(argno > 0);
+    const uint8_t *fmt = (uint8_t*)params->v.str;
+    ++params;
+    --argno;
 
     bool nested = uccm$criticalEnter();
     uccm$printBuf.complete = !!(flags&2);
@@ -213,15 +230,14 @@ void ucPrintF(size_t argno, const char *fmt, int flags, UcFormatParam *params)
         if ( *fmt == '%' && fmt[1] && fmt[1] != '%' )
         {
             memset(&opt,0,sizeof(opt));
-            opt.width1 = -1;
             opt.width2 = -1;
             ++fmt;
             if ( *fmt == '0' && isdigit(fmt[1]) ) { opt.zfiller = true; ++fmt; }
-            if ( isdigit(*fmt) ) opt.width1 = strtol(fmt,(char**)&fmt,10);
+            if ( isdigit(*fmt) ) opt.width1 = strtol((char*)fmt,(char**)&fmt,10);
             if ( *fmt == '.' )
             {
                 ++fmt;
-                if ( isdigit(*fmt) ) opt.width2 = strtol(fmt,(char**)&fmt,10);
+                if ( isdigit(*fmt) ) opt.width2 = strtol((char*)fmt,(char**)&fmt,10);
             }
             if ( isupper(*fmt) ) opt.uppercase = true;
             opt.fmt = tolower(*fmt++);
@@ -248,12 +264,12 @@ void ucPrintF(size_t argno, const char *fmt, int flags, UcFormatParam *params)
 
     if ( flags&1 ) uccm$printChar('\n');
 
-    uccm$flush();
+    uccm$flushPrint();
     uccm$criticalExit(nested);
 }
 
 void uccm$assertFailed(const char *text, const char *file, int line)
 {
     ucError("ASSERT: %? \n\tat %?:%?", $s(text), $s(file), $i(line));
-    ucFatalError(UC_ERROR_IN_ASSERT);
+    ucFatalError();
 }

@@ -132,6 +132,11 @@ object Compiler extends Enumeration {
     case GCC => getGccCli("gcc.exe")
   }
 
+  def sizePath(kind:Value):Option[String] = kind match {
+    case GCC => Some(getGccCli("size.exe"))
+    case ARMCC => None
+  }
+
   def elfToHexCmdl(kind:Value,elfFile:File,outFile:File):String = kind match {
     case ARMCC => fromElf + s" --i32 --output ${outFile.getCanonicalPath} ${elfFile.getCanonicalPath}"
     case GCC => getGccCli("objcopy.exe") + s" -O ihex ${elfFile.getCanonicalPath} ${outFile.getCanonicalPath}"
