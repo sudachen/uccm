@@ -41,7 +41,7 @@
 #define PO_31 PB15
 
 __Inline
-void ucSetup_InputLeg(UcLeg leg, UcInputLegOpt opt)
+void setup_inputLeg(UcLeg leg, UcInputLegOpt opt)
 {
     if ( leg.leg_no < 32 )
         nrf_gpio_cfg(
@@ -56,9 +56,9 @@ void ucSetup_InputLeg(UcLeg leg, UcInputLegOpt opt)
 }
 
 __Inline
-void ucSetup_InputLegset(UcLeg first_leg, UcInputLegOpt opt, unsigned count)
+void setup_inputLegset(UcLeg firstLeg, UcInputLegOpt opt, unsigned count)
 {
-    unsigned pin_no = first_leg.leg_no;
+    unsigned pin_no = firstLeg.leg_no;
 
     __Assert(count <= 16);
 
@@ -75,7 +75,7 @@ void ucSetup_InputLegset(UcLeg first_leg, UcInputLegOpt opt, unsigned count)
 }
 
 __Forceinline
-void ucSetup_OutputLeg(UcLeg leg, UcOutputLegOpt opt)
+void setup_outputLeg(UcLeg leg, UcOutputLegOpt opt)
 {
     if ( leg.leg_no < 32 )
         nrf_gpio_cfg(
@@ -88,9 +88,9 @@ void ucSetup_OutputLeg(UcLeg leg, UcOutputLegOpt opt)
 }
 
 __Forceinline
-void ucSetup_OutputLegset(UcLeg first_leg, UcOutputLegOpt opt, unsigned count)
+void setup_outputLegset(UcLeg firstLeg, UcOutputLegOpt opt, unsigned count)
 {
-    unsigned pin_no = first_leg.leg_no;
+    unsigned pin_no = firstLeg.leg_no;
 
     __Assert(count <= 16);
 
@@ -105,18 +105,18 @@ void ucSetup_OutputLegset(UcLeg first_leg, UcOutputLegOpt opt, unsigned count)
 }
 
 __Inline
-void ucSetup_Analog(UcLeg leg)
+void setup_analogLeg(UcLeg leg)
 {
 }
 
 __Inline
-bool ucGet_Leg(UcLeg leg)
+bool get_leg(UcLeg leg)
 {
     return (NRF_GPIO->IN & ((uint32_t)1<<(leg.leg_no&0x1f))) != 0;
 }
 
 __Inline
-uint16_t ucGet_Legset(UcLeg leg, unsigned count)
+uint16_t get_legset(UcLeg leg, unsigned count)
 {
     __Assert(count <= 16);
 
@@ -125,7 +125,7 @@ uint16_t ucGet_Legset(UcLeg leg, unsigned count)
 }
 
 __Forceinline
-void ucSet_Leg(UcLeg leg, bool value)
+void set_leg(UcLeg leg, bool value)
 {
     if ( value )
         NRF_GPIO->OUTSET = ((uint32_t)1<<(leg.leg_no&0x1f));
@@ -134,7 +134,7 @@ void ucSet_Leg(UcLeg leg, bool value)
 }
 
 __Forceinline
-void ucToggle_Leg(UcLeg leg)
+void toggle_leg(UcLeg leg)
 {
     uint32_t state = NRF_GPIO->OUT;
     uint32_t mask = (uint32_t)1 << (leg.leg_no&0x1f);
@@ -145,10 +145,10 @@ void ucToggle_Leg(UcLeg leg)
 }
 
 __Inline
-void ucSet_Legset(UcLeg first_leg, unsigned count, uint16_t value)
+void set_legset(UcLeg firstLeg, unsigned count, uint16_t value)
 {
-    uint32_t mask = (0xffffffff >> (32-count)) << (first_leg.leg_no&0x1f);
-    uint32_t bits = (uint32_t)value << (first_leg.leg_no&0x1f);
+    uint32_t mask = (0xffffffff >> (32-count)) << (firstLeg.leg_no&0x1f);
+    uint32_t bits = (uint32_t)value << (firstLeg.leg_no&0x1f);
 
     __Assert(count <= 16);
 

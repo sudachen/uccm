@@ -33,21 +33,21 @@ void uccm$criticalExit(bool nested)
 #endif
 }
 
-void ucFatalError()
+void on_fatalError()
 {
-  ucError("FATAL ERROR occured");
+  PRINT_ERROR("FATAL ERROR occured");
   __disable_irq();
   for(;;) __WFI();
 }
 
 __Weak
-void ucPutS(const char* text, bool complete)
+void putStr(const char* text, bool complete)
 {
     (void)text;
 }
 
 __Weak
-void ucSetup_Print(void)
+void setup_print(void)
 {
 }
 
@@ -63,7 +63,7 @@ void uccm$printChar(char c)
     if ( uccm$printBuf.c == sizeof(uccm$printBuf.bf)-1 )
     {
         uccm$printBuf.bf[uccm$printBuf.c] = 0;
-        ucPutS(uccm$printBuf.bf,uccm$printBuf.complete);
+        putStr(uccm$printBuf.bf,uccm$printBuf.complete);
         uccm$printBuf.c = 0;
     }
     uccm$printBuf.bf[uccm$printBuf.c++] = c;
@@ -79,7 +79,7 @@ void uccm$flushPrint()
     if ( uccm$printBuf.c )
     {
         uccm$printBuf.bf[uccm$printBuf.c] = 0;
-        ucPutS(uccm$printBuf.bf,uccm$printBuf.complete);
+        putStr(uccm$printBuf.bf,uccm$printBuf.complete);
         uccm$printBuf.c = 0;
     }
 }
@@ -224,7 +224,7 @@ void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
     uccm$printFloat(param->v.f,opt->width2);
 }
 
-void ucPrintF(size_t argno, int flags, UcFormatParam *params)
+void printF(size_t argno, int flags, UcFormatParam *params)
 {
     UcFormatOpt opt;
 
@@ -254,7 +254,7 @@ void ucPrintF(size_t argno, int flags, UcFormatParam *params)
             opt.fmt = tolower(*fmt++);
             if ( j < argno )
             {
-                params[j].print(&opt,params+j);
+                params[j].printCallback(&opt,params+j);
                 ++j;
             }
             else
@@ -281,6 +281,6 @@ void ucPrintF(size_t argno, int flags, UcFormatParam *params)
 
 void uccm$assertFailed(const char *text, const char *file, int line)
 {
-    ucError("ASSERT: %? \n\tat %?:%?", $s(text), $s(file), $i(line));
-    ucFatalError();
+    PRINT_ERROR("ASSERT: %? \n\tat %?:%?", $s(text), $s(file), $i(line));
+    on_fatalError();
 }

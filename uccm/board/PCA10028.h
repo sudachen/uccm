@@ -27,9 +27,9 @@
 #endif
 
 __Inline
-void ucSetup_Board()
+void setup_board()
 {
-    ucSetup_Print(); // allowes to print assertions
+    setup_print(); // allowes to print assertions
                      // if any backend imported in main.c
 
 #ifdef SOFTDEVICE_PRESENT
@@ -55,6 +55,6 @@ void ucSetup_Board()
 
 #endif
 
-    ucSetup_BoardLEDs();
-    ucSetup_BoardButtons();
+    setup_boardLEDs();
+    setup_boardButtons();
 }

@@ -75,7 +75,7 @@
 
 #define __Do_Not_Remove __attribute__((used))
 
-extern void ucFatalError(void);
+extern void on_fatalError(void);
 
 #pragma uccm require(end) += {UCCM}/uccm/uccm.c
 
@@ -94,42 +94,42 @@ struct UcFormatParam {
         const char *str;
         void *ptr;
     } v;
-    UcFormatPrinter print;
+    UcFormatPrinter printCallback;
 };
 
-void ucSetup_Print(void);
-void ucPutS(const char *text, bool complete);
-void ucPrintF(size_t argno, int flags, UcFormatParam *params);
+void setup_print(void);
+void putStr(const char *text, bool complete);
+void printF(size_t argno, int flags, UcFormatParam *params);
 
 #define C_FORMAT_QUOTE(x,_) x
 
 extern void uccm$print32u(UcFormatOpt *opt,UcFormatParam *param);
-#define $u(val) { .v = {.u = (val)}, .print = uccm$print32u }
+#define $u(val) { .v = {.u = (val)}, .printCallback = uccm$print32u }
 extern void uccm$print32i(UcFormatOpt *opt,UcFormatParam *param);
-#define $i(val) { .v = {.i = (val)}, .print = uccm$print32i }
+#define $i(val) { .v = {.i = (val)}, .printCallback = uccm$print32i }
 extern void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param);
-#define $f(val) { .v = {.f = (val)}, .print = uccm$print32f }
+#define $f(val) { .v = {.f = (val)}, .printCallback = uccm$print32f }
 extern void uccm$print32x(UcFormatOpt *opt,UcFormatParam *param);
-#define $x(val) { .v = {.u = (val)}, .print = uccm$print32x }
+#define $x(val) { .v = {.u = (val)}, .printCallback = uccm$print32x }
 extern void uccm$printOneChar(UcFormatOpt *opt,UcFormatParam *param);
-#define $c(val) { .v = {.u = (val)}, .print = uccm$printOneChar }
+#define $c(val) { .v = {.u = (val)}, .printCallback = uccm$printOneChar }
 extern void uccm$printCstr(UcFormatOpt *opt,UcFormatParam *param);
-#define $s(val) { .v = {.str = (val)}, .print = uccm$printCstr }
+#define $s(val) { .v = {.str = (val)}, .printCallback = uccm$printCstr }
 extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
-#define $p(val) { .v = {.ptr = (void*)(val)}, .print = uccm$printPtr }
+#define $p(val) { .v = {.ptr = (void*)(val)}, .printCallback = uccm$printPtr }
 
 #if defined _DEBUG || defined _FORCE_PRINT
-#define ucPrint(...) ucPrintF_Var(1,0,__VA_ARGS__,NIL)
+#define PRINT(...) UC_PRINTF_VAR(1,0,__VA_ARGS__,NIL)
 #else
-#define ucPrint(...) (void)0
+#define PRINT(...) (void)0
 #endif
 
-#define ucError(...) ucPrintF_Var(1,1,__VA_ARGS__,NIL)
+#define PRINT_ERROR(...) UC_PRINTF_VAR(1,1,__VA_ARGS__,NIL)
 
-#define ucPrintF_Var(nL,Wt,Fmt,...) \
+#define UC_PRINTF_VAR(nL,Wt,Fmt,...) \
     do {\
         UcFormatParam params[] = { {.v = {.str=(Fmt)}}, C_MAP(C_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
-        ucPrintF(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
+        printF(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);

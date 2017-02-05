@@ -6,23 +6,18 @@
 // NTF weak callback
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-    ucFatalError();
+    PRINT_ERROR("NRF FAULT\n\tid=%?, pc=#%?, info=%?",$u(id),$x(pc),$u(info));
+    on_fatalError();
 }
 
-void ucNrfErrorHandler(uint32_t err)
+void on_nrfError(uint32_t err)
 {
-    ucError("NRF ERROR HANDLER\n\terror code %08x", $u(err));
-    ucFatalError();
-}
-
-void ucSoftDeviceFaultHandler(uint32_t id, uint32_t pc, uint32_t info)
-{
-    ucError("NRF SOFTDEVICE FAULT\n\tid=%?, pc=#%?, info=%?",$u(id),$x(pc),$u(info));
-    ucFatalError();
+    PRINT_ERROR("NRF ERROR\n\terror code %08x", $u(err));
+    on_fatalError();
 }
 
 extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int line)
 {
-    ucError("NRF ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
-    ucFatalError();
+    PRINT_ERROR("NRF ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
+    on_fatalError();
 }

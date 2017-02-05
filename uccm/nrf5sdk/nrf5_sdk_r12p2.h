@@ -82,7 +82,7 @@
 
 #pragma uccm require(source) += {UCCM}/uccm/nrf5sdk/nrf5_support.c
 
-extern void ucNrfErrorHandler(uint32_t error);
+extern void on_nrfError(uint32_t error);
 extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int line);
 
 __Forceinline
