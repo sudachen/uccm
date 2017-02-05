@@ -33,8 +33,8 @@ object QtProj {
     }
   }
 
-  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-420")
-  lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte420-log.xml")
+  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-42X")
+  lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte42X-log.xml")
   lazy val qteSettingsFile = new File(BuildScript.uccmRepoDirectoryFile,".qte")
 
   case class InstallStatus(editorIsOk:Boolean = false,settingsIsOk:Boolean = false,isReady:Boolean = false) {

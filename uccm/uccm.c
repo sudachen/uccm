@@ -36,6 +36,7 @@ void uccm$criticalExit(bool nested)
 void ucFatalError()
 {
   ucError("FATAL ERROR occured");
+  __disable_irq();
   for(;;) __WFI();
 }
 
@@ -61,6 +62,7 @@ void uccm$printChar(char c)
 {
     if ( uccm$printBuf.c == sizeof(uccm$printBuf.bf)-1 )
     {
+        uccm$printBuf.bf[uccm$printBuf.c] = 0;
         ucPutS(uccm$printBuf.bf,uccm$printBuf.complete);
         uccm$printBuf.c = 0;
     }
@@ -97,7 +99,11 @@ void uccm$printUnsigned10(uint32_t value)
 
     char bf[11];
 
-    while(value)
+    if (!value)
+    {
+        bf[i++] = '0';
+    }
+    else while(value)
     {
         q = value%10;
         value/=10;
@@ -160,6 +166,11 @@ void uccm$print32u(UcFormatOpt *opt,UcFormatParam *param)
 void uccm$print32i(UcFormatOpt *opt,UcFormatParam *param)
 {
     uccm$printInteger(-1,opt,param);
+}
+
+void uccm$print32x(UcFormatOpt *opt,UcFormatParam *param)
+{
+    uccm$printUnsigned16(param->v.u,opt->width1,opt->uppercase);
 }
 
 void uccm$printOneChar(UcFormatOpt *opt,UcFormatParam *param)

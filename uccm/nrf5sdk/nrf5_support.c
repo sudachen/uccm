@@ -11,12 +11,13 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 
 void ucNrfErrorHandler(uint32_t err)
 {
-    ucError("NRF ERROR HANDLER \n\terror code %08x", $u(err));
+    ucError("NRF ERROR HANDLER\n\terror code %08x", $u(err));
     ucFatalError();
 }
 
 void ucSoftDeviceFaultHandler(uint32_t id, uint32_t pc, uint32_t info)
 {
+    ucError("NRF SOFTDEVICE FAULT\n\tid=%?, pc=#%?, info=%?",$u(id),$x(pc),$u(info));
     ucFatalError();
 }
 

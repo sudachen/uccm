@@ -19,11 +19,12 @@
 #include "../LED.h"
 #include "../button.h"
 
-#if SOFTDEVICE_PRESENT
+#ifdef SOFTDEVICE_PRESENT
 #include <nrf_sdm.h>
+#include <app_util.h>
+#include <ble_stack_handler_types.h>
+#include <softdevice_handler.h>
 #endif
-
-extern void ucSoftDeviceFaultHandler(uint32_t id, uint32_t pc, uint32_t info);
 
 __Inline
 void ucSetup_Board()
@@ -31,18 +32,27 @@ void ucSetup_Board()
     ucSetup_Print(); // allowes to print assertions
                      // if any backend imported in main.c
 
-#if SOFTDEVICE_PRESENT
-    nrf_clock_lf_cfg_t const clock_lf_cfg =
+#ifdef SOFTDEVICE_PRESENT
+
+    static uint32_t bleEvtBuffer[CEIL_DIV(BLE_STACK_EVT_MSG_BUF_SIZE, sizeof(uint32_t))];
+
+    nrf_clock_lf_cfg_t clockLf =
     {.source        = NRF_CLOCK_LF_SRC_XTAL,
      .rc_ctiv       = 0,
      .rc_temp_ctiv  = 0,
      .xtal_accuracy = NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM };
-    __Assert_Nrf_Success sd_softdevice_enable(&clock_lf_cfg,ucSoftDeviceFaultHandler);
+
+    __Nrf_Success softdevice_handler_init(&clockLf,
+                                       bleEvtBuffer,
+                                       sizeof(bleEvtBuffer),
+                                       NULL);
 #else
+
     NRF_CLOCK->LFCLKSRC             = (CLOCK_LFCLKSRC_SRC_XTAL << CLOCK_LFCLKSRC_SRC_Pos);
     NRF_CLOCK->EVENTS_LFCLKSTARTED  = 0;
     NRF_CLOCK->TASKS_LFCLKSTART     = 1;
     while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0) (void)0;
+
 #endif
 
     ucSetup_BoardLEDs();

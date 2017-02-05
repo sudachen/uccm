@@ -67,6 +67,13 @@
     for ( T **__l = &(L); *__l != (E); __l = &(*__l)->next ) \
         {if ( *__l == (O) ) { *__l = (*__l)->next; (O)->next = NULL; break; }}
 
+#define C_SLIST_UNLINK_WHEN(P,T,L,E) \
+    for ( T **__l = &(L); *__l != (E);  ) \
+    {   T *_ = *__l; \
+        if ( P ) { *__l = (*__l)->next;} \
+        else __l = &(*__l)->next; \
+    }
+
 #define C_SLIST_LINK_FRONT(L,O,E) do { (O)->next = (L); (L) = (O); } while(0)
 
 #define C_SLIST_LINK_BACK(T,L,O,E) \

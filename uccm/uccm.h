@@ -109,12 +109,14 @@ extern void uccm$print32i(UcFormatOpt *opt,UcFormatParam *param);
 #define $i(val) { .v = {.i = (val)}, .print = uccm$print32i }
 extern void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param);
 #define $f(val) { .v = {.f = (val)}, .print = uccm$print32f }
+extern void uccm$print32x(UcFormatOpt *opt,UcFormatParam *param);
+#define $x(val) { .v = {.u = (val)}, .print = uccm$print32x }
 extern void uccm$printOneChar(UcFormatOpt *opt,UcFormatParam *param);
 #define $c(val) { .v = {.u = (val)}, .print = uccm$printOneChar }
 extern void uccm$printCstr(UcFormatOpt *opt,UcFormatParam *param);
 #define $s(val) { .v = {.str = (val)}, .print = uccm$printCstr }
 extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
-#define $p(val) { .v = {.ptr = (val)}, .print = uccm$printPtr }
+#define $p(val) { .v = {.ptr = (void*)(val)}, .print = uccm$printPtr }
 
 #if defined _DEBUG || defined _FORCE_PRINT
 #define ucPrint(...) ucPrintF_Var(1,0,__VA_ARGS__,NIL)

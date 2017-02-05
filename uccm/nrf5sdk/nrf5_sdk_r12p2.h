@@ -11,6 +11,10 @@
 #pragma uccm alias(TOOLCHAIN) = [nrf5sdk12]/components/toolchain
 #pragma uccm alias(SOFTDEVICE10) = [nrf5sdk10]/components/softdevice
 
+#ifdef _DEBUG
+#pragma uccm cflags+= -DDEBUG_NRF
+#endif
+
 #pragma uccm let(HEAP_SIZE)?= 0
 #ifdef SOFTDEVICE_PRESENT
 #if defined S130 || defined S132
@@ -52,6 +56,7 @@
     -I "{NRF_LIBRARIES}/timer" \
     -I "{NRF_LIBRARIES}/experimental_section_vars" \
     -I "{NRF_DRIVERS}/hal" \
+    -I "{NRF_DRIVERS}/delay" \
 
 #pragma uccm softdevice(S130)= {SOFTDEVICE}/s130/hex/s130_nrf51_2.0.1_softdevice.hex
 #pragma uccm xcflags(S130)+= -DSOFTDEVICE_PRESENT -DS130 -DBLE_STACK_SUPPORT_REQD \
@@ -83,7 +88,15 @@ extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int
 __Forceinline
 void nrf5_support$checkSuccess(uint32_t err, const char *file, int line)
 {
-    if ( err != NRF_SUCCESS ) nfr5_support$successAssertFailed(err,file,line);
+    if ( err != NRF_SUCCESS )
+        nfr5_support$successAssertFailed(err,file,line);
+}
+
+__Forceinline
+void nrf5_support$checkSuccessIfSupported(uint32_t err, const char *file, int line)
+{
+    if ( err != NRF_ERROR_NOT_SUPPORTED && err != NRF_SUCCESS )
+        nfr5_support$successAssertFailed(err,file,line);
 }
 
 #if defined _DEEBUG || defined _FORCE_ASSERT
@@ -99,6 +112,11 @@ void nrf5_support$checkSuccess(uint32_t err, const char *file, int line)
 #define __Nrf_Success \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
+            case 0: C_LOCAL_ID(err) =
+
+#define __Nrf_Supported \
+    switch(0) \
+        for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccessIfSupported(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
 
 #endif
