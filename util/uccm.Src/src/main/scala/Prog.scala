@@ -268,9 +268,7 @@ object Prog {
     val mainPragmas = if (mainFile.exists) Pragma.extractFrom(mainFile).toList else Nil
     val targetBoard = cmdlOpts.board.getOrElse{ mainPragmas.foldLeft( Option[String](null) ) {
       ( dflts, prag ) => prag match {
-        case Pragma.Default(tag,value) => tag match {
-          case "board" => Some(value)
-        }
+        case Pragma.Default("board",value) => Some(value)
         case _ => dflts
     }} match {
       case None =>
@@ -477,10 +475,10 @@ object Prog {
       wr.println("")
       wr.println("#include <uccm/board.h>")
       wr.println("")
-      wr.println("void main()")
+      wr.println("int main()")
       wr.println("{")
-      wr.println("    ucSetup_Board();")
-      wr.println("    ucSetOn_BoardLED(0);")
+      wr.println("    setup_board();")
+      wr.println("    setOn_boardLED(0);")
       wr.println("    for(;;) __NOP();")
       wr.println("}")
       wr.close()
@@ -537,7 +535,7 @@ object Prog {
       }
 
       val gccPreprocCmdline = cc +
-        " -E " +
+        " -E -D_UCCM_PREPROCESSING " +
         optSelector +
         xcflags.mkString(" ") +
         " " + mainFilePath
@@ -547,8 +545,20 @@ object Prog {
       if ( 0 != (gccPreprocCmdline #> tempFile).! )
         panic("failed to preprocess main C-file")
 
-      def expandVar(lets: Map[String,String])(s: String): String = "(\\{\\$([\\w]+)\\})".r findFirstMatchIn s match {
+      val counters = scala.collection.mutable.Map[String,Int]()
+
+      def expandCounter(s: String): String = "(\\{\\#([\\w]+):(\\d+)\\})".r findFirstMatchIn s match {
         case None => s
+        case Some(m) =>
+          val n = m.group(2)
+          val inc = m.group(3).toInt
+          val value = counters.getOrElse(n,0)
+          counters.put(n,value + inc)
+          expandCounter(s.replace(m.group(1),value.toString))
+      }
+
+      def expandVar(lets: Map[String,String])(s: String): String = "(\\{\\$([\\w]+)\\})".r findFirstMatchIn s match {
+        case None => expandCounter(s)
         case Some(m) => lets.get(m.group(2)) match {
           case None =>
             panic(s"unknown var '${m.group(2)}' is used");s
@@ -617,13 +627,13 @@ object Prog {
           val ulets = bs.lets + ("FIRMWARE_FILE_HEX"->targetHex.getPath)
           bs.copy(
             softDevice = targetSoftDevice,
-            generated = bs.generatedPart.map{t => (t._1,t._2(ulets))}.reverse,
+            generated = bs.generatedPart.reverse.map{t => (t._1,t._2(ulets))},
             cflags = bs.cflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
             ldflags = bs.ldflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
             asflags = bs.asflags.map{expandAlias}.map{expandVar(ulets)}.reverse,
-            sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)},
-            modules = bs.modules.map{expandAlias}.map{expandVar(ulets)}.reverse,
-            libraries = bs.libraries.map{expandAlias}.map{expandVar(ulets)}.reverse,
+            sources = (bs.begin.reverse ++ bs.sources.reverse ++ bs.end).map{expandAlias}.map{expandVar(bs.lets)}.distinct,
+            modules = bs.modules.map{expandAlias}.map{expandVar(ulets)}.reverse.distinct,
+            libraries = bs.libraries.map{expandAlias}.map{expandVar(ulets)}.reverse.distinct,
             debuggerOpt = bs.debuggerOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
             jRttViewOpt = bs.jRttViewOpt.map{expandAlias}.map{expandVar(ulets)}.reverse,
             copyfile = bs.copyfile.mapValues{ v => v.copy(replace = v.replace.reverse) },
@@ -690,7 +700,7 @@ object Prog {
 
     if ( targets.contains(Target.Reconfig) ) {
       info("using next values:")
-      buildScript.lets.foreach {
+      buildScript.lets.toSeq.sortWith(_._1 < _._1).foreach {
         case (name, value) => info(s"  $name => $value")
       }
     }
@@ -760,11 +770,11 @@ object Prog {
           if ( srcFile.getPath.toLowerCase.endsWith(".s") && asm.isDefined )
             (asm.get ::
               (buildScript.asflags ++
-              List(Util.quote(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
+              List(Util.posixPath(srcFile.getPath), "-o", objFile.getPath))).mkString(" ")
           else
             (List(cc, "-c ") ++
               buildScript.cflags ++
-              List(Util.quote(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
+              List(Util.posixPath(srcFile.getPath), "-o", objFile.getPath)).mkString(" ")
         verbose(cmdline)
         if (0 != cmdline.!)
           panic(s"failed to compile ${srcFile.getName}")
@@ -804,7 +814,7 @@ object Prog {
       if (haveToRelink) {
         info("linking ...")
         List(targetBin, targetHex, targetElf).foreach { f => if (f.exists) f.delete }
-        val gccCmdline = (ld :: (buildScript.ldflags ++ objFiles ++ List("-o", targetElf.getPath))).mkString(" ")
+        val gccCmdline = (ld :: (objFiles ++ buildScript.ldflags ++ List("-o", targetElf.getPath))).mkString(" ")
         verbose(gccCmdline)
         if (0 != gccCmdline.!)
           panic(s"failed to link ${targetElf.getName}")
@@ -812,16 +822,20 @@ object Prog {
         verbose(toHexCmdl)
         if (0 != toHexCmdl.!)
           panic(s"failed to generate ${targetHex.getName}")
-        val toBinCmdl = Compiler.elfToBinCmdl(buildScript.ccTool, targetElf, targetBin)
-        verbose(toBinCmdl)
-        if (0 != toBinCmdl.!)
-          panic(s"failed to generate ${targetBin.getName}")
         if (buildScript.ccTool == Compiler.GCC) {
           val cmdl = Compiler.odmpPath(buildScript.ccTool).get + " -d -S " + targetElf.getPath
           verbose(cmdl)
           if (0 != (cmdl #> targetAsm).!)
             panic(s"failed to generate ${targetAsm.getPath}")
         }
+      }
+
+      Compiler.sizePath(buildScript.ccTool) match {
+        case None =>
+        case Some(exe) =>
+          val cmd = exe + " " + targetElf.getPath
+          verbose(cmd)
+          cmd.!
       }
     }
 

@@ -26,6 +26,16 @@ object Util {
     }
   }
 
+  def posixPath(s: String): String = quote {
+    s.map {
+      case '\\' => '/'
+      case '\"' => '\u0000'
+      case c => c
+    }.filter {
+      '\u0000'.!=
+    }
+  }
+
   def unpackZip(file:File, dir:File, preproc: String => Option[String => String] = _ => None ) = {
     val zf = new ZipFile(file)
     try {

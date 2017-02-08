@@ -64,19 +64,26 @@
 #define C_PUSHFRONT(_,List) (_, C_UNWRAP List)
 
 #define C_SLIST_UNLINK(T,L,O,E) \
-    for ( T **l = &L; *l != E; l = &(*l)->next ) \
-        {if ( *l == O ) { *l = (*l)->next; O->next = NULL; break; }}
+    for ( T **__l = &(L); *__l != (E); __l = &(*__l)->next ) \
+        {if ( *__l == (O) ) { *__l = (*__l)->next; (O)->next = NULL; break; }}
 
-#define C_SLIST_LINK_FRONT(L,O,E) do { O->next = L; L = O; } while(0)
+#define C_SLIST_UNLINK_WHEN(P,T,L,E) \
+    for ( T **__l = &(L); *__l != (E);  ) \
+    {   T *_ = *__l; \
+        if ( P ) { *__l = (*__l)->next;} \
+        else __l = &(*__l)->next; \
+    }
+
+#define C_SLIST_LINK_FRONT(L,O,E) do { (O)->next = (L); (L) = (O); } while(0)
 
 #define C_SLIST_LINK_BACK(T,L,O,E) \
-    do { T **l = &L; \
-        while ( *l != E ) l = &(*l)->next; \
-        O->next = *l; *l = O; \
+    do { T **__l = &(L); \
+        while ( *__l != (E) ) __l = &(*__l)->next; \
+        (O)->next = *__l; *__l = (O); \
     } while(0)
 
 #define C_SLIST_LINK_WHEN(P,T,L,O,E) \
-    do { T **l = &L; T *_ = L;\
-        while ( *l != E && !(P) ) { l = &(*l)->next; _ = *l; }\
-        O->next = *l; *l = O; \
+    do { T **__l = &(L); T *_ = (L);\
+        while ( *__l != (E) && !(P) ) { __l = &(*__l)->next; _ = *__l; }\
+        (O)->next = *__l; *__l = (O); \
     } while(0)

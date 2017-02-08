@@ -1,15 +1,20 @@
 
 #include <uccm/board.h>
 
-nrf_nvic_state_t nrf_nvic_state = {0};
-
-void ucSoftDeviceFaultHandler(uint32_t id, uint32_t pc, uint32_t info)
+void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-    ucFatalError(UC_ERROR_IN_SOFTDEVICE);
+    PRINT_ERROR("NRF FAULT\n\tid=%?, pc=#%?, info=%?",$u(id),$x(pc),$u(info));
+    on_fatalError();
+}
+
+void on_nrfError(uint32_t err)
+{
+    PRINT_ERROR("NRF ERROR\n\terror code %08x", $u(err));
+    on_fatalError();
 }
 
 extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int line)
 {
-    ucError("NRF ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
-    ucFatalError(UC_ERROR_IN_ASSERT);
+    PRINT_ERROR("NRF ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
+    on_fatalError();
 }

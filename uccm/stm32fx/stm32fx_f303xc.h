@@ -11,7 +11,6 @@
 #endif
 
 #pragma uccm let(JLINK_DEVICE)?= STM32F303XC
-#pragma uccm debugger(jrttview)+= -d STM32F303XC
 
 #ifdef __keil_v5
 #pragma uccm copy(startup_stm32f303xc.s) = {STM32F3XX}/Source/Templates/arm/startup_stm32f303xc.s

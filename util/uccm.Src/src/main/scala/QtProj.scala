@@ -5,7 +5,7 @@ import org.apache.commons.io.FileUtils
 import scala.util.{Failure, Success, Try}
 import sys.process._
 import scala.xml.dtd.{DocType, PublicID}
-
+import scala.collection.mutable.{Set => JSet}
 object QtProj {
 
   def findQteInSystem: Try[Option[String]] = Try {
@@ -33,8 +33,8 @@ object QtProj {
     }
   }
 
-  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-420")
-  lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte420-log.xml")
+  lazy val qteInstallDir = new File(BuildScript.uccmRepoDirectoryFile,"qte-42X")
+  lazy val qteInstalLogFile = new File(BuildScript.uccmRepoDirectoryFile,".uccm-qte42X-log.xml")
   lazy val qteSettingsFile = new File(BuildScript.uccmRepoDirectoryFile,".qte")
 
   case class InstallStatus(editorIsOk:Boolean = false,settingsIsOk:Boolean = false,isReady:Boolean = false) {
@@ -205,23 +205,28 @@ object QtProj {
       wr.close()
     }
 
-    def generateFiles() = {
-      val wr = new FileWriter(f_files, false)
-      buildScript.sources.foreach{ x=> wr.write(local(x)+"\n") }
-      buildScript.modules.foreach{ x=> wr.write(local(x)+"\n") }
+    def findHeaders(cfile: String, headers: JSet[String]) = {
       val cc = Compiler.ccPath(buildScript.ccTool)
-      val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + mainFile.getPath
+      val cmdl = cc + " -M " + buildScript.cflags.mkString(" ") + " " + cfile
       val where = local(buildDir.getPath)
       val rx = ("("+where+"/[/\\~\\w\\.]+.h)").r
       val pl = ProcessLogger(s => {
         rx.findAllMatchIn(rightSlash(s)).foreach {
           case rx(path) =>
-            wr.write(path+"\n")
+            headers.add(path)
           case _ =>
         }},
         s => Unit)
       BuildConsole.verbose(cmdl)
       cmdl!pl
+    }
+
+    def generateFiles() = {
+      val headers = JSet[String]()
+      val wr = new FileWriter(f_files, false)
+      buildScript.sources.foreach{ x => wr.write(local(x)+"\n"); findHeaders(local(x),headers) }
+      buildScript.modules.foreach{ x => wr.write(local(x)+"\n"); findHeaders(local(x),headers) }
+      headers.toList.sorted.foreach{x => wr.write(x+"\n")}
       wr.close()
     }
 
@@ -257,6 +262,7 @@ object QtProj {
 
     generateConfig()
     generateIncludes()
+    BuildConsole.info("processing files, it can take a time")
     generateFiles()
 
     val env_uuid = "{d8039803-4279-4b90-ad93-64aaffce02ab}"

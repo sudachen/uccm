@@ -25,7 +25,7 @@ if not "%UCCM100DEV%" == "" goto :exec_dev_version
 :exec_no_dev
 if exist "%UCCM100REPO%\uccm-uccm100\uccm100.cmd" goto :uccm100
 cmd /c java -jar %PROGNAME%
-if %errorlevel% EQU 0 goto :eof
+if %errorlevel% EQU 0 goto :uccm100
 echo "failed to acquire uCcm build manager"
 exit 1
 :uccm100
