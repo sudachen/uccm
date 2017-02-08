@@ -1,9 +1,6 @@
 
 #include <uccm/board.h>
 
-//nrf_nvic_state_t nrf_nvic_state = {0};
-
-// NTF weak callback
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
     PRINT_ERROR("NRF FAULT\n\tid=%?, pc=#%?, info=%?",$u(id),$x(pc),$u(info));

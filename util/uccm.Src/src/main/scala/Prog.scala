@@ -268,9 +268,7 @@ object Prog {
     val mainPragmas = if (mainFile.exists) Pragma.extractFrom(mainFile).toList else Nil
     val targetBoard = cmdlOpts.board.getOrElse{ mainPragmas.foldLeft( Option[String](null) ) {
       ( dflts, prag ) => prag match {
-        case Pragma.Default(tag,value) => tag match {
-          case "board" => Some(value)
-        }
+        case Pragma.Default("board",value) => Some(value)
         case _ => dflts
     }} match {
       case None =>

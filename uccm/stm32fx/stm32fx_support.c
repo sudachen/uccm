@@ -2,7 +2,7 @@
 #include <uccm/board.h>
 
 __Weak
-void ucSysTick1ms(void)
+void on_sysTick1ms(void)
 {
     // nothing is here
     // for late implemenation in user code
@@ -11,19 +11,17 @@ void ucSysTick1ms(void)
 void SysTick_Handler(void)
 {
   HAL_IncTick();
-  HAL_SYSTICK_IRQHandler();
-  ucSysTick1ms();
+  on_sysTick1ms();
 }
 
 void stm32fx_support$successAssertFailed(uint32_t err, const char *file, int line)
 {
-    ucError("HAL ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
-    ucFatalError(UC_ERROR_IN_ASSERT);
+    PRINT_ERROR("HAL ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
+    on_fatalError();
 }
 
-void ucConfig_SystemClock_HSE8_72_wUSB(bool hseBypass)
+void config_systemClock_HSE8_72_wUSB(bool hseBypass)
 {
-
   RCC_OscInitTypeDef RCC_OscInitStruct;
   RCC_ClkInitTypeDef RCC_ClkInitStruct;
   RCC_PeriphCLKInitTypeDef PeriphClkInit;
@@ -35,7 +33,7 @@ void ucConfig_SystemClock_HSE8_72_wUSB(bool hseBypass)
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
 
-  __Assert_Hal_Success HAL_RCC_OscConfig(&RCC_OscInitStruct);
+  __Success HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -44,14 +42,14 @@ void ucConfig_SystemClock_HSE8_72_wUSB(bool hseBypass)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  __Assert_Hal_Success HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+  __Success HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
 
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
   PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
 
-  __Assert_Hal_Success HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
+  __Success HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
 
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000); // 1ms interval!
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 

@@ -4,7 +4,7 @@
 #pragma uccm let(JLINK_SPEED)?= 4000
 #pragma uccm let(JLINK_DEVICE)?= CORTEX-M4
 
-#pragma uccm debugger(jrttview)+= -ct usb -speed 4000 -a -if swd
+#pragma uccm debugger(jrttview)+= -ct usb -d {$JLINK_DEVICE} -speed {$JLINK_SPEED} -a -if swd
 
 #pragma uccm file(program.jlink) ~= si 1\n\
 speed {$JLINK_SPEED}\n\

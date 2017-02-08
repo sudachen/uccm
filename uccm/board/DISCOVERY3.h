@@ -22,15 +22,17 @@
 #define UCCM_BOARD_BUTTONS_COUNT C_LIST_LENGTH(UCCM_BOARD_BUTTONS)
 
 #define UCCM_BOARD_MCU_FRECUENCY 72000000
+#define UCCM_TIMER_CLOCK_FREQ 40000 // LSI is used
+#define UCCM_TIMER_CLOCK_PRESCALER 39
 
 #include <uccm/LED.h>
 #include <uccm/button.h>
 
 __Inline
-void ucSetup_Board()
+void setup_board()
 {
     HAL_Init();
-    ucConfig_SystemClock_HSE8_72_wUSB(/*bypass=*/true);
-    ucSetup_BoardLEDs();
-    ucSetup_BoardButtons();
+    config_systemClock_HSE8_72_wUSB(/*bypass=*/true);
+    setup_boardLEDs();
+    setup_boardButtons();
 }

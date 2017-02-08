@@ -121,7 +121,7 @@
 #include "stm32fx_jlink.h"
 
 __Inline
-void ucSetup_BoardUSB()
+void setup_boardUSB()
 {
     __HAL_RCC_USB_CLK_ENABLE();
 

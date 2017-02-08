@@ -135,6 +135,7 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 extern void uccm$assertFailed(const char *text, const char *file, int line);
 
 #pragma uccm file(uccm_dynamic_defs.h) += #pragma once\n\n
+
 #ifndef _UCCM_PREPROCESSING
 #include <uccm_dynamic_defs.h>
 #endif

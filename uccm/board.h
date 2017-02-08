@@ -17,4 +17,3 @@
 #ifdef __keil_v5
 #pragma uccm asflags+= --pd "__STACK_SIZE SETA {$STACK_SIZE}" --pd "__HEAP_SIZE SETA {$HEAP_SIZE}"
 #endif
-

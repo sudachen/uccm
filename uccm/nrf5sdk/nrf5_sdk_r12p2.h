@@ -101,20 +101,20 @@ void nrf5_support$checkSuccessIfSupported(uint32_t err, const char *file, int li
 
 #if defined _DEEBUG || defined _FORCE_ASSERT
 
-#define __Assert_Nrf_Success \
+#define __Assert_Success \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
 #else
 
-#define __Assert_Nrf_Success
+#define __Assert_Success
 
-#define __Nrf_Success \
+#define __Success \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
 
-#define __Nrf_Supported \
+#define __Supported \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccessIfSupported(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =

@@ -42,7 +42,7 @@ void setup_board()
      .rc_temp_ctiv  = 0,
      .xtal_accuracy = NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM };
 
-    __Nrf_Success softdevice_handler_init(&clockLf,
+    __Success softdevice_handler_init(&clockLf,
                                        bleEvtBuffer,
                                        sizeof(bleEvtBuffer),
                                        NULL);

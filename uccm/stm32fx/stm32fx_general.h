@@ -22,10 +22,8 @@
 
 #pragma uccm require(source) += {UCCM}/uccm/stm32fx/stm32fx_support.c
 
-extern void ucConfig_SystemClock_HSE8_72_wUSB(bool hseBypass);
-extern void ucSysTick1ms(void);
-
-#if defined _DEEBUG || defined _FORCE_ASSERT
+extern void config_systemClock_HSE8_72_wUSB(bool hseBypass);
+extern void on_sysTick1ms(void);
 
 extern void stm32fx_support$successAssertFailed(uint32_t err, const char *file, int line);
 
@@ -35,12 +33,21 @@ void stm32fx_support$checkSuccess(uint32_t err, const char *file, int line)
     if ( err != HAL_OK ) stm32fx_support$successAssertFailed(err,file,line);
 }
 
-#define __Assert_Hal_Success \
+#if defined _DEEBUG || defined _FORCE_ASSERT
+
+#define __Assert_Success \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;stm32fx_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
 #else
 
-#define __Assert_Hal_Success
+#define __Assert_Success
 
 #endif
+
+#define __Success \
+    switch(0) \
+        for(uint32_t C_LOCAL_ID(err);0;stm32fx_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
+            case 0: C_LOCAL_ID(err) =
+
+#define __Supported __Success
