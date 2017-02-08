@@ -15,6 +15,14 @@
 #pragma uccm cflags+= -DDEBUG_NRF
 #endif
 
+#ifdef SOFTDEVICE_PRESENT
+#pragma uccm require(module)+= {SOFTDEVICE}/common/softdevice_handler/softdevice_handler.c
+#endif
+
+#pragma uccm require(module)+= {NRF_LIBRARIES}/util/app_util_platform.c
+#pragma uccm require(module)+= {NRF_LIBRARIES}/util/app_error.c
+#pragma uccm require(module)+= {NRF_LIBRARIES}/util/nrf_assert.c
+
 #pragma uccm let(HEAP_SIZE)?= 0
 #ifdef SOFTDEVICE_PRESENT
 #if defined S130 || defined S132
@@ -26,7 +34,7 @@
 #pragma uccm let(STACK_SIZE)?= 0x400
 #endif
 
-#if defined SOFTDEVICE_PRESENT
+#ifdef SOFTDEVICE_PRESENT
 #ifdef S130
 #pragma uccm let(ROM_APP_BASE)= 0x1b000
 #pragma uccm let(RAM_APP_BASE)?= 0x01fe8
