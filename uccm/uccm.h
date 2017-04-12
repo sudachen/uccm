@@ -7,7 +7,7 @@
 
 #pragma uccm board(*)= -D_UCCM_VERSION=100
 #pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161,1293,177
-#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
+#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas --short-enums
 
 #ifdef _DEBUG
 #pragma uccm let(CFLAGS_OPT)?= -g -O0
@@ -133,6 +133,13 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);
+extern bool uccm$irqCriticalEnter();
+extern void uccm$irqCriticalExit(bool);
+
+#define __No_Irq \
+    switch (0) for ( bool uccm$nested; 0; uccm$irqCriticalExit(uccm$nested) ) \
+        if(1) { case 0: uccm$nested = uccm$irqCriticalEnter(); goto C_LOCAL_ID(doIt); } \
+        else C_LOCAL_ID(doIt):
 
 #pragma uccm file(uccm_dynamic_defs.h) += #pragma once\n\n
 

@@ -15,6 +15,11 @@ void on_nrfError(uint32_t err)
 
 extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int line)
 {
-    PRINT_ERROR("NRF ASSERT FAILED \n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
+    PRINT_ERROR("NRF ASSERT FAILED\n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
     on_fatalError();
+}
+
+extern void nfr5_support$printError(uint32_t err, const char *file, int line)
+{
+    PRINT_ERROR("NRF PRINT ON FAIL\n\tat %?:%?\n\terror code %08x", $s(file), $i(line), $u(err));
 }

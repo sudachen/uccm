@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <math.h>
 
-bool uccm$criticalEnter()
+bool uccm$irqCriticalEnter()
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     uint8_t nestedCriticalReqion = 0;
@@ -24,7 +24,7 @@ bool uccm$criticalEnter()
 #endif
 }
 
-void uccm$criticalExit(bool nested)
+void uccm$irqCriticalExit(bool nested)
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     sd_nvic_critical_region_exit(nested);
@@ -233,50 +233,51 @@ void printF(size_t argno, int flags, UcFormatParam *params)
     ++params;
     --argno;
 
-    bool nested = uccm$criticalEnter();
-    uccm$printBuf.complete = !!(flags&2);
-
-    for ( int j = 0 ; *fmt ; )
+    __No_Irq
     {
-        if ( *fmt == '%' && fmt[1] && fmt[1] != '%' )
+        uccm$printBuf.complete = !!(flags&2);
+
+        for ( int j = 0 ; *fmt ; )
         {
-            memset(&opt,0,sizeof(opt));
-            opt.width2 = -1;
-            ++fmt;
-            if ( *fmt == '0' && isdigit(fmt[1]) ) { opt.zfiller = true; ++fmt; }
-            if ( isdigit(*fmt) ) opt.width1 = strtol((char*)fmt,(char**)&fmt,10);
-            if ( *fmt == '.' )
+            if ( *fmt == '%' && fmt[1] && fmt[1] != '%' )
             {
+                memset(&opt,0,sizeof(opt));
+                opt.width2 = -1;
                 ++fmt;
-                if ( isdigit(*fmt) ) opt.width2 = strtol((char*)fmt,(char**)&fmt,10);
+                if ( *fmt == '0' && isdigit(fmt[1]) ) { opt.zfiller = true; ++fmt; }
+                if ( isdigit(*fmt) ) opt.width1 = strtol((char*)fmt,(char**)&fmt,10);
+                if ( *fmt == '.' )
+                {
+                    ++fmt;
+                    if ( isdigit(*fmt) ) opt.width2 = strtol((char*)fmt,(char**)&fmt,10);
+                }
+                if ( isupper(*fmt) ) opt.uppercase = true;
+                opt.fmt = tolower(*fmt++);
+                if ( j < argno )
+                {
+                    params[j].printCallback(&opt,params+j);
+                    ++j;
+                }
+                else
+                    uccm$printStr("<no param>");
+
             }
-            if ( isupper(*fmt) ) opt.uppercase = true;
-            opt.fmt = tolower(*fmt++);
-            if ( j < argno )
+            else if ( *fmt == '%' && fmt[1] == '%' )
             {
-                params[j].printCallback(&opt,params+j);
-                ++j;
+                uccm$printChar('%');
+                fmt+=2;
             }
             else
-                uccm$printStr("<no param>");
+            {
+                uccm$printChar(*fmt);
+                ++fmt;
+            }
+        }
 
-        }
-        else if ( *fmt == '%' && fmt[1] == '%' )
-        {
-            uccm$printChar('%');
-            fmt+=2;
-        }
-        else
-        {
-            uccm$printChar(*fmt);
-            ++fmt;
-        }
+        if ( flags&1 ) uccm$printChar('\n');
+
+        uccm$flushPrint();
     }
-
-    if ( flags&1 ) uccm$printChar('\n');
-
-    uccm$flushPrint();
-    uccm$criticalExit(nested);
 }
 
 void uccm$assertFailed(const char *text, const char *file, int line)
