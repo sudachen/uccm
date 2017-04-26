@@ -6,11 +6,11 @@
 #pragma uccm board(pca10040)= -D_BOARD_FILE=PCA10040.h -DNRF52832 -DBOARD_PCA10040 -DNRF52
 #pragma uccm softdevice(BLE)=> S132
 
-#define UCCM_BOARD_MCU_FRECUENCY 16000000
-#define UCCM_BOARD_LEDS (1,PO_21,LEG_OPEN_DRAIN), (2,PO_22,LEG_OPEN_DRAIN), (3,PO_23,LEG_OPEN_DRAIN), (4,PO_24,LEG_OPEN_DRAIN), NIL
+#define UCCM_BOARD_MCU_FRECUENCY 32000000
+#define UCCM_BOARD_LEDS (1,PO_17,LEG_OPEN_DRAIN), (2,PO_18,LEG_OPEN_DRAIN), (3,PO_19,LEG_OPEN_DRAIN), (4,PO_20,LEG_OPEN_DRAIN), NIL
 #define UCCM_BOARD_LEDS_COUNT C_LIST_LENGTH(UCCM_BOARD_LEDS)
 
-#define UCCM_BOARD_BUTTONS (1,PO_17,LEG_PULL_UP), (2,PO_18,LEG_PULL_UP), (3,PO_19,LEG_PULL_UP), (4,PO_20,LEG_PULL_UP), NIL
+#define UCCM_BOARD_BUTTONS (1,PO_13,LEG_PULL_UP), (2,PO_14,LEG_PULL_UP), (3,PO_15,LEG_PULL_UP), (4,PO_16,LEG_PULL_UP), NIL
 #define UCCM_BOARD_BUTTONS_COUNT C_LIST_LENGTH(UCCM_BOARD_BUTTONS)
 
 #define UCCM_LL_INCLUDE(File) <uccm/nrf5sdk/nrf5_##File>
@@ -30,7 +30,7 @@ __Inline
 void setup_board()
 {
     setup_print(); // allowes to print assertions
-                     // if any backend imported in main.c
+                   // if any backend imported in main.c
 
 #ifdef SOFTDEVICE_PRESENT
 

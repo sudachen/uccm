@@ -51,7 +51,7 @@
 
 #pragma uccm default(softdevice)= BLE
 #pragma uccm default(debugger)= nrfjprog
-#pragma uccm debugger(jrttview)+= -ct usb -speed 4000 -a -if swd
+#pragma uccm debugger(jrttview)+= -ct usb -speed 2000 -a -if swd
 
 #pragma uccm xcflags(gcc)+= -I "{TOOLCHAIN}/gcc"
 #pragma uccm xcflags(armcc)+= -I "{TOOLCHAIN}/arm"
@@ -128,6 +128,8 @@ void nrf5_support$printOnFail(uint32_t err, const char *file, int line)
 
 #define __Assert_Success
 
+#endif
+
 #define __Success \
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccess(C_LOCAL_ID(err),__FILE__,__LINE__)) \
@@ -142,9 +144,6 @@ void nrf5_support$printOnFail(uint32_t err, const char *file, int line)
     switch(0) \
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$printOnFail(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
-
-#endif
-
 
 #ifdef __keil_v5
 

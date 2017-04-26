@@ -51,6 +51,12 @@ void setup_print(void)
 {
 }
 
+__Weak
+void reset_board(void)
+{
+    NVIC_SystemReset();
+}
+
 struct { uint8_t c; char bf[15]; bool complete; } uccm$printBuf = { 0, };
 
 void uccm$printComplete(bool complete)
@@ -224,6 +230,13 @@ void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
     uccm$printFloat(param->v.f,opt->width2);
 }
 
+bool uccm$completeAlways = false;
+
+void completePrint_always()
+{
+    uccm$completeAlways = true;
+}
+
 void printF(size_t argno, int flags, UcFormatParam *params)
 {
     UcFormatOpt opt;
@@ -235,7 +248,7 @@ void printF(size_t argno, int flags, UcFormatParam *params)
 
     __No_Irq
     {
-        uccm$printBuf.complete = !!(flags&2);
+        uccm$printBuf.complete = !!(flags&2) || uccm$completeAlways;
 
         for ( int j = 0 ; *fmt ; )
         {

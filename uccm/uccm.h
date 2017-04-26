@@ -98,8 +98,10 @@ struct UcFormatParam {
 };
 
 void setup_print(void);
+void reset_board(void);
 void putStr(const char *text, bool complete);
 void printF(size_t argno, int flags, UcFormatParam *params);
+void completePrint_always();
 
 #define C_FORMAT_QUOTE(x,_) x
 
