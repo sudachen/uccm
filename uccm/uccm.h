@@ -120,8 +120,10 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 
 #if defined _DEBUG || defined _FORCE_PRINT
 #define PRINT(...) UC_PRINTF_VAR(1,0,__VA_ARGS__,NIL)
+#define __If_Print
 #else
 #define PRINT(...) (void)0
+#define PRINT_IS_ENABLED 0
 #endif
 
 #define PRINT_ERROR(...) UC_PRINTF_VAR(1,1,__VA_ARGS__,NIL)
