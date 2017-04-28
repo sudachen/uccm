@@ -35,8 +35,8 @@ void uccm$irqCriticalExit(bool nested)
 
 void on_fatalError()
 {
-  PRINT_ERROR("FATAL ERROR occured");
   __disable_irq();
+  PRINT_ERROR("FATAL ERROR occured");
   for(;;) __WFI();
 }
 
@@ -246,7 +246,7 @@ void printF(size_t argno, int flags, UcFormatParam *params)
     ++params;
     --argno;
 
-    __No_Irq
+    __Critical // is not good solution, but simple
     {
         uccm$printBuf.complete = !!(flags&2) || uccm$completeAlways;
 
@@ -295,6 +295,7 @@ void printF(size_t argno, int flags, UcFormatParam *params)
 
 void uccm$assertFailed(const char *text, const char *file, int line)
 {
+    __disable_irq();
     PRINT_ERROR("ASSERT: %? \n\tat %?:%?", $s(text), $s(file), $i(line));
     on_fatalError();
 }
