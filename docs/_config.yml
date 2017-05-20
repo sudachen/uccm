@@ -1,6 +1,6 @@
 
 theme: jekyll-theme-slate
-title: uC Cortex-M zero-config build tool
+title: uC Cortex-M build tool
 github:
   repository_url: https://github.com/sudachen/uccm
 gems:
