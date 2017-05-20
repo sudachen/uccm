@@ -349,6 +349,26 @@ img.padding_20 {
   -ms-box-shadow: none;
 }
 
+img.padding_0 {
+  padding: 5px 0px 5px 0px;
+  border: none;
+  box-shadow: none;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  -o-box-shadow: none;
+  -ms-box-shadow: none;
+}
+
+img.padding_0_0 {
+  padding: 0px;
+  border: none;
+  box-shadow: none;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  -o-box-shadow: none;
+  -ms-box-shadow: none;
+}
+
 .zip_download_link {
   display: block;
   float: right;
