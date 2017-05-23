@@ -1,4 +1,4 @@
-# uCcm
+# uCcm [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 It's the tool for easy studying and fast prototyping embedded solutions based on Cortex-M uCs. Currently it  supports Stm32fx and NRF5x hardware.
 

@@ -23,10 +23,21 @@ void setOff_LED(const UcLED *led)
     set_leg(led->leg,(led->leg_opt!=LEG_OPEN_DRAIN)?0:1);
 }
 
+__Forceinline
+bool isOn_LED(const UcLED *led)
+{
+    if ( get_outLeg(led->leg) )
+        return (led->leg_opt==LEG_OPEN_DRAIN)?false:true;
+    else
+        return (led->leg_opt==LEG_OPEN_DRAIN)?true:false;
+}
+
+#define ONE_LEDISON(x,y) __Forceinline bool C_CONCAT2(isOn_boardLED_,C_GETITEM_0 x)(){ UcLED led = {(C_GETITEM_1 x),(C_GETITEM_2 x)}; return isOn_LED(&led); }
 #define ONE_LEDON(x,y) __Forceinline void C_CONCAT2(setOn_boardLED_,C_GETITEM_0 x)(){ set_leg((C_GETITEM_1 x),((C_GETITEM_2 x)!=LEG_OPEN_DRAIN)?1:0); }
 #define ONE_LEDOFF(x,y) __Forceinline void C_CONCAT2(setOff_boardLED_,C_GETITEM_0 x)(){ set_leg((C_GETITEM_1 x),((C_GETITEM_2 x)!=LEG_OPEN_DRAIN)?0:1); }
 #define ONE_LEDTOGGLE(x,y) __Forceinline void C_CONCAT2(toggle_boardLED_,C_GETITEM_0 x)(){ toggle_leg((C_GETITEM_1 x)); }
 
+C_MAP(ONE_LEDISON,C_SPACE,UCCM_BOARD_LEDS)
 C_MAP(ONE_LEDON,C_SPACE,UCCM_BOARD_LEDS)
 C_MAP(ONE_LEDOFF,C_SPACE,UCCM_BOARD_LEDS)
 C_MAP(ONE_LEDTOGGLE,C_SPACE,UCCM_BOARD_LEDS)

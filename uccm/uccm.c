@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <math.h>
 
-bool uccm$criticalEnter()
+bool uccm$irqCriticalEnter()
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     uint8_t nestedCriticalReqion = 0;
@@ -24,7 +24,7 @@ bool uccm$criticalEnter()
 #endif
 }
 
-void uccm$criticalExit(bool nested)
+void uccm$irqCriticalExit(bool nested)
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     sd_nvic_critical_region_exit(nested);
@@ -35,8 +35,8 @@ void uccm$criticalExit(bool nested)
 
 void on_fatalError()
 {
-  PRINT_ERROR("FATAL ERROR occured");
   __disable_irq();
+  PRINT_ERROR("FATAL ERROR occured");
   for(;;) __WFI();
 }
 
@@ -49,6 +49,12 @@ void putStr(const char* text, bool complete)
 __Weak
 void setup_print(void)
 {
+}
+
+__Weak
+void reset_board(void)
+{
+    NVIC_SystemReset();
 }
 
 struct { uint8_t c; char bf[15]; bool complete; } uccm$printBuf = { 0, };
@@ -224,6 +230,13 @@ void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
     uccm$printFloat(param->v.f,opt->width2);
 }
 
+bool uccm$completeAlways = false;
+
+void completePrint_always()
+{
+    uccm$completeAlways = true;
+}
+
 void printF(size_t argno, int flags, UcFormatParam *params)
 {
     UcFormatOpt opt;
@@ -233,54 +246,56 @@ void printF(size_t argno, int flags, UcFormatParam *params)
     ++params;
     --argno;
 
-    bool nested = uccm$criticalEnter();
-    uccm$printBuf.complete = !!(flags&2);
-
-    for ( int j = 0 ; *fmt ; )
+    __Critical // is not good solution, but simple
     {
-        if ( *fmt == '%' && fmt[1] && fmt[1] != '%' )
+        uccm$printBuf.complete = !!(flags&2) || uccm$completeAlways;
+
+        for ( int j = 0 ; *fmt ; )
         {
-            memset(&opt,0,sizeof(opt));
-            opt.width2 = -1;
-            ++fmt;
-            if ( *fmt == '0' && isdigit(fmt[1]) ) { opt.zfiller = true; ++fmt; }
-            if ( isdigit(*fmt) ) opt.width1 = strtol((char*)fmt,(char**)&fmt,10);
-            if ( *fmt == '.' )
+            if ( *fmt == '%' && fmt[1] && fmt[1] != '%' )
             {
+                memset(&opt,0,sizeof(opt));
+                opt.width2 = -1;
                 ++fmt;
-                if ( isdigit(*fmt) ) opt.width2 = strtol((char*)fmt,(char**)&fmt,10);
+                if ( *fmt == '0' && isdigit(fmt[1]) ) { opt.zfiller = true; ++fmt; }
+                if ( isdigit(*fmt) ) opt.width1 = strtol((char*)fmt,(char**)&fmt,10);
+                if ( *fmt == '.' )
+                {
+                    ++fmt;
+                    if ( isdigit(*fmt) ) opt.width2 = strtol((char*)fmt,(char**)&fmt,10);
+                }
+                if ( isupper(*fmt) ) opt.uppercase = true;
+                opt.fmt = tolower(*fmt++);
+                if ( j < argno )
+                {
+                    params[j].printCallback(&opt,params+j);
+                    ++j;
+                }
+                else
+                    uccm$printStr("<no param>");
+
             }
-            if ( isupper(*fmt) ) opt.uppercase = true;
-            opt.fmt = tolower(*fmt++);
-            if ( j < argno )
+            else if ( *fmt == '%' && fmt[1] == '%' )
             {
-                params[j].printCallback(&opt,params+j);
-                ++j;
+                uccm$printChar('%');
+                fmt+=2;
             }
             else
-                uccm$printStr("<no param>");
+            {
+                uccm$printChar(*fmt);
+                ++fmt;
+            }
+        }
 
-        }
-        else if ( *fmt == '%' && fmt[1] == '%' )
-        {
-            uccm$printChar('%');
-            fmt+=2;
-        }
-        else
-        {
-            uccm$printChar(*fmt);
-            ++fmt;
-        }
+        if ( flags&1 ) uccm$printChar('\n');
+
+        uccm$flushPrint();
     }
-
-    if ( flags&1 ) uccm$printChar('\n');
-
-    uccm$flushPrint();
-    uccm$criticalExit(nested);
 }
 
 void uccm$assertFailed(const char *text, const char *file, int line)
 {
+    __disable_irq();
     PRINT_ERROR("ASSERT: %? \n\tat %?:%?", $s(text), $s(file), $i(line));
     on_fatalError();
 }

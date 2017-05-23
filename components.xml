@@ -58,7 +58,7 @@
   <component>
     <name>jlink</name>
     <althome></althome>
-    <download>https://www.segger.com/downloads/jlink/JLink_Windows_V612e.exe</download>
+    <download>https://www.segger.com/downloads/jlink/JLink_Windows_V614d.exe</download>
     <description>SEGGER J-Link debugging/programming utility</description>
     <type>setup</type>
     <root></root>

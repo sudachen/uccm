@@ -110,6 +110,12 @@ void setup_analogLeg(UcLeg leg)
 }
 
 __Inline
+bool get_outLeg(UcLeg leg)
+{
+    return (NRF_GPIO->OUT & ((uint32_t)1<<(leg.leg_no&0x1f))) != 0;
+}
+
+__Inline
 bool get_leg(UcLeg leg)
 {
     return (NRF_GPIO->IN & ((uint32_t)1<<(leg.leg_no&0x1f))) != 0;

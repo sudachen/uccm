@@ -1,0 +1,13 @@
+
+theme: jekyll-theme-slate
+title: uC Cortex-M build tool
+github:
+  repository_url: https://github.com/sudachen/uccm
+gems:
+  - jekyll-feed
+  - jekyll-theme-slate
+exclude:
+  - Gemfile
+  - Gemfile.lock
+
+

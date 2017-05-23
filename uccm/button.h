@@ -32,6 +32,14 @@ C_MAP(GET_ONE_BTN,C_SPACE,UCCM_BOARD_BUTTONS)
 
 #undef GET_ONE_BTN
 
+#define ENUM_ONE_BTN(x,y) C_CONCAT2(BOARD_BUTTON_,C_GETITEM_0 x) = y
+
+enum BoardButtons
+{
+C_MAP(ENUM_ONE_BTN,C_COMMA,UCCM_BOARD_BUTTONS)
+};
+#undef ENUM_ONE_BTN
+
 __Inline
 bool get_boardButton(uint8_t no)
 {

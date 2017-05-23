@@ -63,10 +63,22 @@
 #define C_UNWRAP(x) x
 #define C_PUSHFRONT(_,List) (_, C_UNWRAP List)
 
+/**
+  T - type of node
+  L - ptr to list
+  O - processing list node
+  E - end of list aka NULL or barrier
+  */
 #define C_SLIST_UNLINK(T,L,O,E) \
     for ( T **__l = &(L); *__l != (E); __l = &(*__l)->next ) \
         {if ( *__l == (O) ) { *__l = (*__l)->next; (O)->next = NULL; break; }}
 
+/**
+  P - predicate
+  T - type of node
+  L - ptr to list
+  E - end of list aka NULL or barrier
+  */
 #define C_SLIST_UNLINK_WHEN(P,T,L,E) \
     for ( T **__l = &(L); *__l != (E);  ) \
     {   T *_ = *__l; \
@@ -74,16 +86,51 @@
         else __l = &(*__l)->next; \
     }
 
+/**
+  P - predicate
+  T - type of node
+  L - ptr to list
+  E - end of list aka NULL or barrier
+  */
+#define C_SLIST_UNLINK_WHEN_ONCE(P,T,L,E) \
+    for ( T **__l = &(L); *__l != (E);  ) \
+    {   T *_ = *__l; \
+        if ( P ) { *__l = (*__l)->next; break; } \
+        else __l = &(*__l)->next; \
+    }
+
+/**
+  L - ptr to list
+  O - processing list node
+  E - end of list aka NULL or barrier
+  */
 #define C_SLIST_LINK_FRONT(L,O,E) do { (O)->next = (L); (L) = (O); } while(0)
 
+/**
+  T - type of node
+  L - ptr to list
+  O - processing list node
+  E - end of list aka NULL or barrier
+  */
 #define C_SLIST_LINK_BACK(T,L,O,E) \
     do { T **__l = &(L); \
         while ( *__l != (E) ) __l = &(*__l)->next; \
         (O)->next = *__l; *__l = (O); \
     } while(0)
 
+/**
+  P - predicate
+  T - type of node
+  L - ptr to list
+  O - processing list node
+  E - end of list aka NULL or barrier
+  */
 #define C_SLIST_LINK_WHEN(P,T,L,O,E) \
     do { T **__l = &(L); T *_ = (L);\
         while ( *__l != (E) && !(P) ) { __l = &(*__l)->next; _ = *__l; }\
         (O)->next = *__l; *__l = (O); \
     } while(0)
+
+
+#define C_BASE_OF(Type,Field,Ptr) \
+    (Type*)((uintptr_t)(Ptr) - (uintptr_t)(&((Type*)0)->Field))

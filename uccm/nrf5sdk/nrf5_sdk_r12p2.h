@@ -38,6 +38,9 @@
 #ifdef S130
 #pragma uccm let(ROM_APP_BASE)= 0x1b000
 #pragma uccm let(RAM_APP_BASE)?= 0x01fe8
+#elif defined S132
+#pragma uccm let(ROM_APP_BASE)= 0x1f000
+#pragma uccm let(RAM_APP_BASE)?= 0x02128
 #else
 #error have no memory layout for this softdevice
 #endif
@@ -48,7 +51,7 @@
 
 #pragma uccm default(softdevice)= BLE
 #pragma uccm default(debugger)= nrfjprog
-#pragma uccm debugger(jrttview)+= -ct usb -speed 4000 -a -if swd
+#pragma uccm debugger(jrttview)+= -ct usb -speed 2000 -a -if swd
 
 #pragma uccm xcflags(gcc)+= -I "{TOOLCHAIN}/gcc"
 #pragma uccm xcflags(armcc)+= -I "{TOOLCHAIN}/arm"
@@ -92,6 +95,7 @@
 
 extern void on_nrfError(uint32_t error);
 extern void nfr5_support$successAssertFailed(uint32_t err, const char *file, int line);
+extern void nfr5_support$printError(uint32_t err, const char *file, int line);
 
 __Forceinline
 void nrf5_support$checkSuccess(uint32_t err, const char *file, int line)
@@ -107,6 +111,13 @@ void nrf5_support$checkSuccessIfSupported(uint32_t err, const char *file, int li
         nfr5_support$successAssertFailed(err,file,line);
 }
 
+__Forceinline
+void nrf5_support$printOnFail(uint32_t err, const char *file, int line)
+{
+    if ( err != NRF_SUCCESS )
+        nfr5_support$printError(err,file,line);
+}
+
 #if defined _DEEBUG || defined _FORCE_ASSERT
 
 #define __Assert_Success \
@@ -116,6 +127,8 @@ void nrf5_support$checkSuccessIfSupported(uint32_t err, const char *file, int li
 #else
 
 #define __Assert_Success
+
+#endif
 
 #define __Success \
     switch(0) \
@@ -127,8 +140,10 @@ void nrf5_support$checkSuccessIfSupported(uint32_t err, const char *file, int li
         for(uint32_t C_LOCAL_ID(err);0;nrf5_support$checkSuccessIfSupported(C_LOCAL_ID(err),__FILE__,__LINE__)) \
             case 0: C_LOCAL_ID(err) =
 
-#endif
-
+#define __Print_On_Fail \
+    switch(0) \
+        for(uint32_t C_LOCAL_ID(err);0;nrf5_support$printOnFail(C_LOCAL_ID(err),__FILE__,__LINE__)) \
+            case 0: C_LOCAL_ID(err) =
 
 #ifdef __keil_v5
 
@@ -165,7 +180,7 @@ SECTIONS\n\
   } > RAM\n\
 } INSERT AFTER .data;\n\
 \n\
-INCLUDE "nrf51_common.ld"\n
+INCLUDE "nrf5x_common.ld"\n
 
 #pragma uccm ldflags+= -T[@inc]/firmware.ld
 

@@ -7,7 +7,7 @@
 
 #pragma uccm board(*)= -D_UCCM_VERSION=100
 #pragma uccm xcflags(armcc)+= --c99 --no_wrap_diagnostics --diag_suppress 161,1293,177
-#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas
+#pragma uccm xcflags(gcc)+= --std=c99 -fmessage-length=0 -fdata-sections -ffunction-sections -mthumb -Wno-unknown-pragmas --short-enums
 
 #ifdef _DEBUG
 #pragma uccm let(CFLAGS_OPT)?= -g -O0
@@ -65,7 +65,7 @@
 #define __Assert_S(x,Text) (void)0
 #endif
 
-#define __Unreachable() __Assert_S(0,"unreachable code")
+#define __Unreachable __Assert_S(0,"unreachable code")
 #define __Assert(x) __Assert_S(x,#x)
 
 #define ucSet_Bits(Where, Bits)   ((Where) |= (Bits))
@@ -98,10 +98,10 @@ struct UcFormatParam {
 };
 
 void setup_print(void);
+void reset_board(void);
 void putStr(const char *text, bool complete);
 void printF(size_t argno, int flags, UcFormatParam *params);
-
-#define C_FORMAT_QUOTE(x,_) x
+void completePrint_always();
 
 extern void uccm$print32u(UcFormatOpt *opt,UcFormatParam *param);
 #define $u(val) { .v = {.u = (val)}, .printCallback = uccm$print32u }
@@ -120,19 +120,29 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 
 #if defined _DEBUG || defined _FORCE_PRINT
 #define PRINT(...) UC_PRINTF_VAR(1,0,__VA_ARGS__,NIL)
+#define __If_Print
 #else
 #define PRINT(...) (void)0
+#define PRINT_IS_ENABLED 0
 #endif
 
 #define PRINT_ERROR(...) UC_PRINTF_VAR(1,1,__VA_ARGS__,NIL)
 
+#define UC_FORMAT_QUOTE(x,_) x
 #define UC_PRINTF_VAR(nL,Wt,Fmt,...) \
     do {\
-        UcFormatParam params[] = { {.v = {.str=(Fmt)}}, C_MAP(C_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
+        UcFormatParam params[] = { {.v = {.str=(Fmt)}}, C_MAP(UC_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
         printF(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);
+extern bool uccm$irqCriticalEnter();
+extern void uccm$irqCriticalExit(bool);
+
+#define __Critical \
+    switch (0) for ( bool uccm$nested; 0; uccm$irqCriticalExit(uccm$nested) ) \
+        if(1) { case 0: uccm$nested = uccm$irqCriticalEnter(); goto C_LOCAL_ID(doIt); } \
+        else C_LOCAL_ID(doIt):
 
 #pragma uccm file(uccm_dynamic_defs.h) += #pragma once\n\n
 
