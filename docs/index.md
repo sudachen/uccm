@@ -35,7 +35,7 @@ Since this quick start uses pca10028 board based on BLE powered uC nRF51422, ucc
 uccm --program-softdevice
 ```
 
-It erases all chip flash memory and writes softdevice to the begin. Normally it's required to program softdevice only once. For this operation the board should be coonected to the PC and powered on.
+It erases all chip flash memory and writes softdevice to the begin. Normally it's required to program softdevice only once. For this operation the board should be connected to the PC and powered on.
 
 Ok, now all is ready to start simplified example turning on one LED. For compiling and flashing compiled firmare press start button. It is green trinagle at the bottom of the left panel in the editor. 
 
