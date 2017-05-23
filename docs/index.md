@@ -19,7 +19,7 @@ int main()
 }
 ```
 
-Secondary, we need the uccm start script which is available on GitHub https://github.com/sudachen/uccm/blob/master/uccm100-dist.zip. Now when we have in one directory main.c and uccm.cmd go to the directory and start next command 
+Secondary, we need the uccm start script which is available on GitHub [github.com/sudachen/uccm/blob/uccm100/uccm100-dist.zip](https://github.com/sudachen/uccm/blob/uccm100/uccm100-dist.zip). Now when we have in one directory main.c and uccm.cmd go to the directory and start next command 
 ```
 uccm -y --edit
 ```
