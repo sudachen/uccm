@@ -19,7 +19,9 @@ int main()
 }
 ```
 
-Secondary, we need the uccm start script which is available on GitHub [github.com/sudachen/uccm/blob/uccm100/uccm100-dist.zip](https://github.com/sudachen/uccm/blob/uccm100/uccm100-dist.zip). Now when we have in one directory main.c and uccm.cmd go to the directory and start next command 
+Secondary, we need the uccm start script which is available on GitHub [uccm100-dist.zip](https://github.com/sudachen/uccm/blob/uccm100/uccm100-dist.zip). 
+
+Now, when we have in one directory main.c and uccm.cmd, go to the directory and start the next command 
 ```
 uccm -y --edit
 ```
@@ -28,17 +30,19 @@ It downloads all required SDK files, gcc compiler and code editor. At final it c
 
 ![create new project](assets/create_project.png)
 
-Since this quick start uses pca10028 board based on nRF51823 BLE powered uC, by default uccm configures firmware as used softdevice. Softdevice is the special firmaware operating with radio channel and allowing to user code communicate va Bluetooth Low Energy. It requirese write this firmware once to the board. Fo this do the next command
+Since this quick start uses pca10028 board based on BLE powered uC nRF51422, uccm by default configures firmware as used softdevice. Softdevice is the special firmaware operating with radio channel and allowing to communicate via Bluetooth Low Energy. To write sofdevice on the flash do the next command
 ```
 uccm --program-softdevice
 ```
 
-It erases all chip flash memory and writes softdevice to the begin. Normally it is required to do only once. For this operation devboard chould be coonected to the PC and powered on.
+It erases all chip flash memory and writes softdevice to the begin. Normally it's required to program softdevice only once. For this operation the board should be coonected to the PC and powered on.
 
-Ok, now all is ready to start simplified example turning on one LED. For compale and flash compiled firmare press start button. It is green trinagle at the bottom of the left panel in the editor. 
+Ok, now all is ready to start simplified example turning on one LED. For compiling and flashing compiled firmare press start button. It is green trinagle at the bottom of the left panel in the editor. 
 
 ![run firmware](assets/run_firmware.png)
 
 Devboard should resets and lights LED1.
+
+
 
 
