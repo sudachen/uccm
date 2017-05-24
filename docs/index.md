@@ -1,11 +1,11 @@
 <img class="padding_20" src="assets/devkit.jpg" width="660px" align="center"/>
 
 # Overview
-The uccm is an **uC Cortex-M zero-config build tool and modules manager**. It means this building tool does not require additional configuration files. All required information needed to build firmware is available in the source code. Also the tool automatically gets modules from guithub detecting required modules by _#include_ C-preprocessor directives.
+The uccm is an **uC Cortex-M zero-config building tool and modules manager**. It means this building tool does not require any additional configuration files. All required information needed to build your firmware is available in the source code. Also the tool automatically gets modules from guithub detecting required modules by _#include_ C-preprocessor directives.
 
 # Quick Start with PCA10028 (nRF51)
 
-Let's start with a simple example turning on one LED. First, we need a main.c file like a following:
+Let's start with a simple example turning on one LED. First, we need a main.c file like the following:
 ```c 
 #pragma uccm default(board) = pca10028
 #pragma uccm let(HEAP_SIZE) = 0
@@ -26,11 +26,11 @@ Now, when we have in one directory main.c and uccm.cmd, go to the directory and 
 uccm -y --edit
 ```
 
-It downloads all required SDK files, gcc compiler and code editor. Finally, it creates a project and opens main.c in code editor.
+It downloads all required SDK files, gcc compiler and code editor. Finally, it creates a project and opens main.c in the code editor.
 
 ![create new project](assets/create_project.png)
 
-Since this quick start uses pca10028 board based on BLE powered uC nRF51422, uccm by default configures firmware as used softdevice. Softdevice is the special firmware operating with radio channel and allowing to communicate via Bluetooth Low Energy. To write sofdevice on the flash, do the next command
+Since this quick start uses pca10028 board based on BLE powered uC nRF51422, uccm by default configures the firmware as used softdevice. Softdevice is a special firmware operating with radio channel and allowing communications via Bluetooth Low Energy. To write a sofdevice on the flash, run the next command
 ```
 uccm --program-softdevice
 ```
