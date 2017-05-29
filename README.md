@@ -1,9 +1,5 @@
 # uCcm [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-It's the tool for easy studying and fast prototyping embedded solutions based on Cortex-M uCs. Currently it  supports Stm32fx and NRF5x hardware.
+The uccm is an uC Cortex-M zero-config building tool and modules manager. It means this building tool does not require any additional configuration files. All required information needed to build your firmware is available in the source code. Also the tool automatically gets modules from guithub detecting required modules by #include C-preprocessor directives.
 
-What you need to start is only uccm.cmd file. Place it to the root of the empty project. Now you can do the command, for example 
-``uccm -y -n -b pca10028 --edit``
-It will create simple main file, will get all required frameworks and software, also it will create and start QtCreator project. Qt project is ready to be build in one click and ready to program built firmware to connected board in one click also.
-
-
+[Quick Start With Nordic PCA10028](https://sudachen.github.io/uccm/#quick-start-with-pca10028-nrf51)
