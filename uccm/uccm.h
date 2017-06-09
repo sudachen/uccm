@@ -99,9 +99,9 @@ struct UcFormatParam {
 
 void setup_print(void);
 void reset_board(void);
-void putStr(const char *text, bool complete);
-void printF(size_t argno, int flags, UcFormatParam *params);
-void completePrint_always();
+void _put_string(const char *text, bool complete);
+void print_format(size_t argno, int flags, UcFormatParam *params);
+void let_printCompleteAlways();
 
 extern void uccm$print32u(UcFormatOpt *opt,UcFormatParam *param);
 #define $u(val) { .v = {.u = (val)}, .printCallback = uccm$print32u }
@@ -120,7 +120,7 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 
 #if defined _DEBUG || defined _FORCE_PRINT
 #define PRINT(...) UC_PRINTF_VAR(1,0,__VA_ARGS__,NIL)
-#define __If_Print
+#define PRINT_IS_ENABLED 1
 #else
 #define PRINT(...) (void)0
 #define PRINT_IS_ENABLED 0
@@ -132,7 +132,7 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
 #define UC_PRINTF_VAR(nL,Wt,Fmt,...) \
     do {\
         UcFormatParam params[] = { {.v = {.str=(Fmt)}}, C_MAP(UC_FORMAT_QUOTE,C_COMMA,__VA_ARGS__)}; \
-        printF(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
+        print_format(sizeof(params)/sizeof(params[0]),(nL?1:0)|(Wt?2:0),params); \
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);

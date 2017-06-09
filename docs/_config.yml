@@ -1,6 +1,7 @@
 
 theme: jekyll-theme-slate
 title: uC Cortex-M build tool
+google_analytics: UA-99577378-1
 github:
   repository_url: https://github.com/sudachen/uccm
 gems:
