@@ -2,7 +2,8 @@
 theme: jekyll-theme-slate
 title: uC Cortex-M building tool
 google_analytics: UA-99577378-1
-github:
+repository: sudachen/uccm
+github: 
   repository_url: https://github.com/sudachen/uccm
 gems:
   - jekyll-feed
