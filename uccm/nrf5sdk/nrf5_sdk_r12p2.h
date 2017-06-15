@@ -147,21 +147,28 @@ void nrf5_support$printOnFail(uint32_t err, const char *file, int line)
 
 #ifdef __keil_v5
 
-#pragma uccm file(firmware.sct)~= LR_IROM1 {$ROM_BASE}+{$ROM_APP_BASE} {$ROM_SIZE}-{$ROM_APP_BASE}  {\n\
+#pragma uccm file(firmware.sct)~= \
+  LR_IROM1 {$ROM_BASE}+{$ROM_APP_BASE} {$ROM_SIZE}-{$ROM_APP_BASE}  {\n\
   ER_IROM1 {$ROM_BASE}+{$ROM_APP_BASE} {$ROM_SIZE}-{$ROM_APP_BASE}  {
 #pragma uccm file(firmware.sct)+= \n\
     *.obj (RESET, +First) \n\
     *(InRoot$$Sections) \n\
     .ANY (+RO) \n\
   }
-#pragma uccm file(firmware.sct)~= \n  RW_IRAM1 {$RAM_BASE}+{$RAM_APP_BASE} {$RAM_SIZE}-{$RAM_APP_BASE}  {\n    .ANY (+RW +ZI)\n  }\n}
+#pragma uccm file(firmware.sct)~= \n\
+  RW_IRAM1 {$RAM_BASE}+{$RAM_APP_BASE} {$RAM_SIZE}-{$RAM_APP_BASE}\
+  {\n    .ANY (+RW +ZI)\n  }\n}
 
 #else
 
 #pragma uccm file(firmware.ld)~= SEARCH_DIR({TOOLCHAIN}/gcc) \n
-#pragma uccm file(firmware.ld)+= GROUP(-lgcc -lc -lnosys) \n\nMEMORY\n{\n
-#pragma uccm file(firmware.ld)~= FLASH (rx) : ORIGIN = {$ROM_BASE}+{$ROM_APP_BASE}, LENGTH = {$ROM_SIZE}-{$ROM_APP_BASE}\n
-#pragma uccm file(firmware.ld)~= RAM (rwx) :  ORIGIN = {$RAM_BASE}+{$RAM_APP_BASE}, LENGTH = {$RAM_SIZE}-{$RAM_APP_BASE}\n}\n
+#pragma uccm file(firmware.ld)+= GROUP(-lgcc -lc -lnosys) \n\nMEMORY\n{
+#pragma uccm file(firmware.ld)~= \n FLASH (rx) :\
+ ORIGIN = {$ROM_BASE}+{$ROM_APP_BASE},\
+ LENGTH = {$ROM_SIZE}-{$ROM_APP_BASE}
+#pragma uccm file(firmware.ld)~= \n RAM (rwx) :\
+ ORIGIN = {$RAM_BASE}+{$RAM_APP_BASE},\
+ LENGTH = {$RAM_SIZE}-{$RAM_APP_BASE}\n}\n
 
 #pragma uccm file(firmware.ld)+= \n\
 SECTIONS\n\

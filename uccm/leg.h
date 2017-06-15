@@ -3,7 +3,10 @@
 #include "uccm.h"
 
 typedef struct { uint8_t leg_no; } UcLeg;
+
+#ifndef __C_HIGHLIGHT
 #define UCCM_LEG(Group,Leg) ((UcLeg){((Group-'A')<<4) | Leg})
+#endif
 
 #define PA0  UCCM_LEG('A',0)
 #define PA1  UCCM_LEG('A',1)
