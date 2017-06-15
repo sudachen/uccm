@@ -89,3 +89,17 @@ void toggle_boardLED(uint8_t no)
     default:;
     }
 }
+
+__Inline
+bool isOn_boardLED(uint8_t no)
+{
+    switch(no)
+    {
+#define ISON_ONE_LED(x,y) case y: { UcLED led = {(C_GETITEM_1 x),(C_GETITEM_2 x)}; return isOn_LED(&led); }
+    C_MAP(ISON_ONE_LED,C_SEMICOLON,UCCM_BOARD_LEDS);
+#undef  ISON_ONE_LED
+    default:;
+    }
+
+    return false;
+}

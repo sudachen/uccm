@@ -41,7 +41,7 @@ void on_fatalError()
 }
 
 __Weak
-void putStr(const char* text, bool complete)
+void _put_string(const char* text, bool complete)
 {
     (void)text;
 }
@@ -69,7 +69,7 @@ void uccm$printChar(char c)
     if ( uccm$printBuf.c == sizeof(uccm$printBuf.bf)-1 )
     {
         uccm$printBuf.bf[uccm$printBuf.c] = 0;
-        putStr(uccm$printBuf.bf,uccm$printBuf.complete);
+        _put_string(uccm$printBuf.bf,uccm$printBuf.complete);
         uccm$printBuf.c = 0;
     }
     uccm$printBuf.bf[uccm$printBuf.c++] = c;
@@ -85,7 +85,7 @@ void uccm$flushPrint()
     if ( uccm$printBuf.c )
     {
         uccm$printBuf.bf[uccm$printBuf.c] = 0;
-        putStr(uccm$printBuf.bf,uccm$printBuf.complete);
+        _put_string(uccm$printBuf.bf,uccm$printBuf.complete);
         uccm$printBuf.c = 0;
     }
 }
@@ -232,12 +232,12 @@ void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
 
 bool uccm$completeAlways = false;
 
-void completePrint_always()
+void let_printCompleteAlways()
 {
     uccm$completeAlways = true;
 }
 
-void printF(size_t argno, int flags, UcFormatParam *params)
+void print_format(size_t argno, int flags, UcFormatParam *params)
 {
     UcFormatOpt opt;
 

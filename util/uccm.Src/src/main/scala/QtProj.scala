@@ -253,6 +253,7 @@ object QtProj {
       BuildConsole.verbose(cmdl)
       cmdl!pl
       tempFile.delete
+      wr.write("#define __C_HIGHLIGHT 1\n")
       wr.close()
     }
 
