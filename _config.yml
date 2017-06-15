@@ -1,0 +1,21 @@
+
+theme: jekyll-theme-slate
+title: uC Cortex-M building tool
+google_analytics: UA-99577378-1
+repository: sudachen/uccm
+github: 
+  repository_url: https://github.com/sudachen/uccm
+gems:
+  - jekyll-feed
+  - jekyll-theme-slate
+exclude:
+  - Gemfile
+  - Gemfile.lock
+kramdown:
+  syntax_highlighter_opts:
+    #line_numbers: true # bad idea, spans don't need linenos and would inherit this option
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
