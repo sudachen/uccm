@@ -60,7 +60,7 @@
 #define C_GETITEM(N,List) C_EVAL(C_GETITEM_##N List)
 
 #define C_MAP(_Q, Sps, ...) C_APPLY(_Q, 0, Sps, __VA_ARGS__)
-#define C_UNWRAP(x) x
+#define C_UNWRAP(...) __VA_ARGS__
 #define C_PUSHFRONT(_,List) (_, C_UNWRAP List)
 
 /**
