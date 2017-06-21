@@ -47,7 +47,7 @@ Board should reset and light LED1.
 
 # Using Modules
 
-Really it's a good idea to move some funtionality to the separated module for resue and
+It's a good idea to move some functionality to a separated module for reuse and
 reducing complexity. The other good idea is importing required modules automaticaly right
 from the github.
 
@@ -56,9 +56,9 @@ Uccm imports modules from github with only one line of code in .C file
 #include <~githubuser/reponame/import.h>
 ```
 
-For example let's try to make classic helloworld program which prints "hello world!" on the screen.
-Yep, uC board have no screen yet, but it can use UART or, better, SEGGER RTT mechanism to print
-on console running on the connected PC.
+For example let's try to make a classic helloworld program which prints "hello world!" on the screen.
+Actually, uC board have no screen yet, but it can use UART or, even better, SEGGER RTT mechanism to print
+on console running on a connected PC.
 
 ```c
 #pragma uccm default(board) = pca10028
@@ -79,7 +79,7 @@ int main()
 There are two changes. First is at the line 5, we import here a module which implements printing funtionality based on SEGGER RTT.
 Second is at the line 11, here we print classic helloworld message.
 
-Let's now do rebuild project. Use _Build_ menu from menu bar and choose _Rebuild All_.
+Let's now rebuild the project. Use _Build_ menu from menu bar and choose _Rebuild All_.
 It will reconfigure our project and fetch the printing module from github.
 
 To see what uC is printing we need start a RTT consloe, do next command to start one.
