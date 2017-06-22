@@ -1,6 +1,6 @@
 
 #pragma once
-#include "uccm.h"
+#include <uccm/uccm.h>
 
 typedef struct { uint8_t leg_no; } UcLeg;
 

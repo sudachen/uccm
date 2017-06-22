@@ -1,5 +1,5 @@
 
-#include "irq.h"
+#include <uccm/irq.h>
 
 const IrqHandler uccm_irq$Nil = { NULL, NULL };
 

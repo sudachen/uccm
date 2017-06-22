@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <math.h>
 
-bool uccm$irqCriticalEnter()
+bool uccm$irqCriticalEnter(void)
 {
 #if defined __nRF5x_UC__ && defined SOFTDEVICE_PRESENT
     uint8_t nestedCriticalReqion = 0;
@@ -80,7 +80,7 @@ void uccm$printStr(const char *s)
     while (*s) uccm$printChar(*s++);
 }
 
-void uccm$flushPrint()
+void uccm$flushPrint(void)
 {
     if ( uccm$printBuf.c )
     {
@@ -232,7 +232,7 @@ void uccm$print32f(UcFormatOpt *opt,UcFormatParam *param)
 
 bool uccm$completeAlways = false;
 
-void let_printCompleteAlways()
+void let_printCompleteAlways(void)
 {
     uccm$completeAlways = true;
 }

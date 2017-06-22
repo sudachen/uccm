@@ -1,6 +1,6 @@
 
 #pragma once
-#include "uccm.h"
+#include <uccm/uccm.h>
 
 #define UCCM_BOARD_INCLUDE(File) C_STR(board/File)
 

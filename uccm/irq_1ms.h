@@ -8,8 +8,9 @@
 
 
 #pragma once
+
 #include <uccm/board.h>
-#include "irq.h"
+#include <uccm/irq.h>
 
 #ifdef __nRF5x_UC__
 #include <app_util_platform.h>
@@ -17,7 +18,7 @@
 #define APP_TIMER_PRESCALER 32
 #endif
 
-#pragma uccm require(end) += {UCCM}/uccm/irq/irq_1ms.c
+#pragma uccm require(end) += {UCCM}/uccm/irq_1ms.c
 
 extern IrqHandler *IRQlist_1ms; // virtual IRQ signalled every 1ms
 #define TIMED_IRQ IRQlist_1ms

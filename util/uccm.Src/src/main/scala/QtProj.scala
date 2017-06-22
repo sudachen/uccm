@@ -276,7 +276,7 @@ object QtProj {
     val buildCfgOpt = "--"+BuildConfig.stringify(buildScript.config)
     val compilerOpt = "--"+Compiler.stringify(buildScript.ccTool)
     val boardOpt = "-b "+buildScript.boardName
-    val uccmArgs = List(boardOpt,compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c").mkString(" ")
+    val uccmArgs = List(boardOpt,compilerOpt,softDeviceOpt,debuggerOpt,buildCfgOpt,"-c",buildScript.mainC).mkString(" ")
 
     val qtUser =
 <qtcreator>

@@ -1,12 +1,13 @@
 
 #pragma once
+
 #include <uccm/board.h>
 
 #ifdef __nRF5x_UC__
 #include <app_util_platform.h>
 #endif
 
-#pragma uccm require(end) += {UCCM}/uccm/irq/irq.c
+#pragma uccm require(end) += {UCCM}/uccm/irq.c
 
 typedef enum IrqPriority IrqPriority;
 

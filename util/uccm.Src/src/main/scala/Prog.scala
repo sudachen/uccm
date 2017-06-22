@@ -573,7 +573,7 @@ object Prog {
       }
 
       Pragma.extractFromTempFile(tempFile).foldLeft(
-        BuildScript(targetBoard,targetCompiler,preTargetDebugger,cmdlOpts.buildConfig,
+        BuildScript(targetBoard,mainFile.getName,targetCompiler,preTargetDebugger,cmdlOpts.buildConfig,
           s"-I{UCCM}" :: optSelector :: cmdlOpts.cflags,
           List(mainFilePath))) {
         (bs,prag) => prag match {

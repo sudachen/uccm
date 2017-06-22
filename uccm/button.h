@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include "uccm.h"
-#include "leg.h"
+#include <uccm/uccm.h>
+#include <uccm/leg.h>
 
 typedef struct {
   UcLeg leg;

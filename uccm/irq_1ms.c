@@ -1,6 +1,6 @@
 
-#include "irq.h"
-#include "irq_1ms.h"
+#include <uccm/irq.h>
+#include <uccm/irq_1ms.h>
 
 #ifdef __nRF5x_UC__
 #include <nrf_delay.h>
@@ -20,9 +20,6 @@ void RTC1_IRQHandler(void)
     //__SEV();
 }
 
-#endif
-
-#ifdef __nRF5x_UC__
 void uccm_irq$startRTC1()
 {
     if ( uccm_irq$RtcIsStarted ) return;

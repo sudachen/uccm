@@ -101,7 +101,7 @@ void setup_print(void);
 void reset_board(void);
 void _put_string(const char *text, bool complete);
 void print_format(size_t argno, int flags, UcFormatParam *params);
-void let_printCompleteAlways();
+void let_printCompleteAlways(void);
 
 extern void uccm$print32u(UcFormatOpt *opt,UcFormatParam *param);
 #define $u(val) { .v = {.u = (val)}, .printCallback = uccm$print32u }
@@ -136,7 +136,7 @@ extern void uccm$printPtr(UcFormatOpt *opt,UcFormatParam *param);
     } while(0)
 
 extern void uccm$assertFailed(const char *text, const char *file, int line);
-extern bool uccm$irqCriticalEnter();
+extern bool uccm$irqCriticalEnter(void);
 extern void uccm$irqCriticalExit(bool);
 
 #define __Critical \

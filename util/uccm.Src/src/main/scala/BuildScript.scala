@@ -19,6 +19,7 @@ object BuildConfig extends Enumeration {
 
 case class FileCopy(to:String,from:String,replace:List[(String,Map[String,String])=>String]=Nil)
 case class BuildScript(boardName:String,
+	               mainC:String,
                        ccTool:Compiler.Value,
                        debugger:Option[Debugger.Value],
                        config:BuildConfig.Value,
@@ -42,6 +43,9 @@ case class BuildScript(boardName:String,
   <board>
     {boardName}
   </board>
+  <main>
+    {mainC}
+  </main>
   <cctool>
     {Compiler.stringify(ccTool)}
   </cctool>
@@ -113,6 +117,7 @@ object BuildScript {
     def ns(s:String) = s.dropWhile{bs}.reverse.dropWhile{bs}.reverse
     BuildScript(
       ns((xml\"board").text),
+      mainC = ns((xml\"main").text),
       Compiler.fromString(ns((xml\"cctool" ).text)).get,
       Debugger.fromString(ns((xml\"debugger" ).text)),
       BuildConfig.fromString(ns((xml\"config" ).text)).get,
